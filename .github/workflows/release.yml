@@ -35,9 +35,10 @@ jobs:
 
       - name: Package
         run: |
-          tar czf ${{ matrix.artifact }}.tar.gz \
-            -C target/${{ matrix.target }}/release envx \
-            completions/
+          mkdir -p dist/${{ matrix.artifact }}/completions
+          cp target/${{ matrix.target }}/release/envx dist/${{ matrix.artifact }}/envx
+          cp -R completions/. dist/${{ matrix.artifact }}/completions/
+          tar czf ${{ matrix.artifact }}.tar.gz -C dist ${{ matrix.artifact }}
           shasum -a 256 ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.sha256
 
       - name: Upload artifact

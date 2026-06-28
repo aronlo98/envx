@@ -1,5 +1,8 @@
 /target
 .claude/
+dist/
+*.tar.gz
+*.sha256
 
 # Environment files (never commit secrets)
 *.envx
