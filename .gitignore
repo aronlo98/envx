@@ -1,0 +1,12 @@
+/target
+.claude/
+
+# Environment files (never commit secrets)
+*.envx
+!examples/**/*.envx
+
+# Editor / OS
+.DS_Store
+.env
+.vscode/
+.idea/

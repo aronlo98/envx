@@ -1,0 +1,35 @@
+[package]
+name = "envx"
+version = "0.1.0"
+edition = "2024"
+description = "Modern, safe CLI tool for processing .envx files"
+license = "MIT"
+
+[[bin]]
+name = "envx"
+path = "src/main.rs"
+
+[dependencies]
+# CLI argument parsing
+clap = { version = "4", features = ["derive"] }
+
+# Lexer via procedural macros (DFA-based, O(n))
+logos = "0.14"
+
+# DAG construction, cycle detection, topological sort
+petgraph = "0.6"
+
+# Human-friendly error reports with source spans
+miette = { version = "7", features = ["fancy"] }
+
+# derive(Error) for internal error types
+thiserror = "2"
+
+# IndexMap: HashMap that preserves insertion order (needed for ResolvedEnv)
+indexmap = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

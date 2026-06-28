@@ -1,0 +1,177 @@
+mod ast;
+mod builtins;
+mod dag;
+mod error;
+mod evaluator;
+mod lexer;
+mod loader;
+mod parser;
+mod value;
+
+use std::{path::PathBuf, process};
+
+use clap::{Parser, Subcommand};
+use indexmap::IndexMap;
+use miette::Report;
+
+use ast::{ResolvedEnv, Segment, Span, Statement, Template};
+use error::{EnvxError, Result};
+use value::Value;
+
+// ─── CLI definitions ──────────────────────────────────────────────────────────
+
+#[derive(Parser)]
+#[command(
+    name = "envx",
+    version,
+    about = "Modern .envx processor — dynamic variables, pipe functions, imports"
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Evaluate a .envx file and run a command with those variables injected
+    Run {
+        /// Path to the .envx file
+        file: PathBuf,
+
+        /// Command and arguments (use `--` to separate from envx options)
+        #[arg(trailing_var_arg = true, required = true, value_name = "CMD")]
+        cmd: Vec<String>,
+    },
+
+    /// Print all variables as `export KEY="VALUE"` statements
+    ///
+    /// Typical use:  eval $(envx export app.envx)
+    Export {
+        /// Path to the .envx file
+        file: PathBuf,
+    },
+
+    /// Evaluate a single expression using OS environment for variable references
+    ///
+    /// Example:  envx eval '$HOME | lower'
+    Eval {
+        /// The expression to evaluate
+        #[arg(value_name = "EXPR")]
+        expr: String,
+    },
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+fn main() {
+    let cli = Cli::parse();
+    let result = match cli.command {
+        Commands::Run { file, cmd } => cmd_run(file, cmd),
+        Commands::Export { file } => cmd_export(file),
+        Commands::Eval { expr } => cmd_eval(expr),
+    };
+
+    if let Err(e) = result {
+        eprintln!("{:?}", Report::new(e));
+        process::exit(1);
+    }
+}
+
+// ─── Subcommand: run ──────────────────────────────────────────────────────────
+
+fn cmd_run(file: PathBuf, cmd: Vec<String>) -> Result<()> {
+    let vars = load_and_eval(&file)?;
+
+    // cmd is guaranteed non-empty by clap's `required = true`.
+    let binary = &cmd[0];
+    let args = &cmd[1..];
+
+    let status = process::Command::new(binary)
+        .args(args)
+        .envs(vars.into_iter().map(|(k, v)| (k, v.into_string())))
+        .status()
+        .map_err(|e| EnvxError::Io {
+            path: binary.clone(),
+            source: e,
+        })?;
+
+    process::exit(status.code().unwrap_or(1));
+}
+
+// ─── Subcommand: export ───────────────────────────────────────────────────────
+
+fn cmd_export(file: PathBuf) -> Result<()> {
+    let vars = load_and_eval(&file)?;
+    for (key, val) in vars {
+        // Escape backslashes first so the substitution below doesn't double-escape.
+        let escaped = val.into_string().replace('\\', "\\\\").replace('"', "\\\"");
+        println!("export {key}=\"{escaped}\"");
+    }
+    Ok(())
+}
+
+// ─── Subcommand: eval ─────────────────────────────────────────────────────────
+
+fn cmd_eval(expr: String) -> Result<()> {
+    let eval_path = PathBuf::from("<eval>");
+
+    // Wrap the user-supplied expression in a synthetic .envx entry.
+    let src = format!("__RESULT__ = \"${{{{ {expr} }}}}\"\n");
+
+    // Pre-populate the env with all OS environment variables so that
+    // `$HOME`, `$PATH`, etc. resolve inside the expression.
+    let mut env = ResolvedEnv::default();
+    for (key, val) in std::env::vars() {
+        if is_valid_envx_ident(&key) {
+            env.entries
+                .insert(key, (literal_template(val), eval_path.clone()));
+        }
+    }
+    env.sources.insert(eval_path.clone(), src.clone());
+
+    // Parse the synthetic entry; it may reference OS vars loaded above.
+    let file = parser::parse(&src, "<eval>", eval_path)?;
+    for stmt in file.statements {
+        if let Statement::Entry { key, template, source, .. } = stmt {
+            // Insert last so __RESULT__ always wins even if an OS var shares the name.
+            env.entries.insert(key, (template, source));
+        }
+    }
+
+    let order = dag::build_and_sort(&env)?;
+    let values = evaluator::evaluate(&env, &order)?;
+
+    if let Some(v) = values.get("__RESULT__") {
+        println!("{}", v.as_str_repr());
+    }
+
+    Ok(())
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+fn load_and_eval(file: &PathBuf) -> Result<IndexMap<String, Value>> {
+    let env = loader::load(file)?;
+    let order = dag::build_and_sort(&env)?;
+    evaluator::evaluate(&env, &order)
+}
+
+/// `true` if `s` is a valid envx identifier: `[A-Za-z_][A-Za-z0-9_]*`.
+/// Used to filter OS env vars whose names can't be referenced in an expression.
+fn is_valid_envx_ident(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {
+            chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+        }
+        _ => false,
+    }
+}
+
+/// Build a single-literal `Template` without going through the parser.
+fn literal_template(val: String) -> Template {
+    Template {
+        segments: vec![Segment::Literal(val)],
+        span: Span::default(),
+    }
+}
