@@ -54,6 +54,32 @@ cargo install --path .
 envx --version
 ```
 
+### Shell completions
+
+Completion scripts for bash, zsh, fish, and PowerShell are included in every release inside the `completions/` folder.
+
+**zsh**
+```sh
+cp completions/_envx ~/.zfunc/_envx
+# Make sure ~/.zfunc is in your fpath (add to ~/.zshrc if needed):
+# fpath=(~/.zfunc $fpath)
+```
+
+**bash**
+```sh
+cp completions/envx.bash ~/.bash_completion.d/envx
+```
+
+**fish**
+```sh
+cp completions/envx.fish ~/.config/fish/completions/envx.fish
+```
+
+**PowerShell**
+```powershell
+cp completions/_envx.ps1 $PROFILE\..\completions\_envx.ps1
+```
+
 ---
 
 ## Syntax
@@ -61,14 +87,29 @@ envx --version
 ### Basic assignment
 
 ```env
-KEY = "value"
+KEY     = "value"
+PORT    = 8080
+APP_ENV = development
 ```
 
 - One assignment per line.
 - Keys must match `[A-Za-z_][A-Za-z0-9_]*`.
-- Values are always double-quoted strings.
+- Values may be **double-quoted strings** or **bare (unquoted) literals**.
 - Everything outside `${{ }}` is literal text.
 - Comments start with `#`.
+
+> **Note:** Bare values are always plain strings — they cannot contain `${{ }}` template blocks. Use double quotes when you need dynamic expressions.
+
+### String literals inside expressions
+
+String arguments inside `${{ }}` blocks use **single quotes**:
+
+```env
+ENV_LABEL = "${{ if eq($APP_ENV, 'prod') then 'Production' else 'Development' }}"
+TIMESTAMP = "${{ now('YYYYMMDD') }}"
+```
+
+Double quotes delimit the outer value, so single quotes are used inside to avoid ambiguity.
 
 ### Template blocks
 
@@ -158,6 +199,15 @@ All transformations go through a fixed whitelist. There are no user-defined func
 | `concat` | `Str... → Str` | Concatenate two or more strings |
 | `default` | `Str, fallback:Str → Str` | Return `fallback` if the input is an empty string |
 | `eq` | `Any, Any → Bool` | True if both arguments have the same string representation |
+| `now` | `() → Str` or `(fmt:Str) → Str` | Current local date/time. No argument returns ISO 8601. Accepts moment.js-style format tokens (see below) |
+| `secret` | `() → Str`, `(len:Int) → Str`, or `(len:Int, preset:Str) → Str` | Random string. Default: 32 alphanumeric chars. Second argument accepts a named preset (`'hex'`, `'base64'`, `'base64url'`, `'alpha'`, `'numeric'`) or a custom character set |
+| `capitalize` | `Str → Str` | First letter uppercase, rest lowercase: `"hello world" → "Hello world"` |
+| `title` | `Str → Str` | Each word capitalized: `"hello world" → "Hello World"` |
+| `truncate` | `Str, n:Int → Str` | Keep only the first `n` characters |
+| `abs` | `Int → Int` | Absolute value. Use after `\| int` if the input is a string |
+| `round` | `Str → Str` or `Str, decimals:Int → Str` | Round a numeric string. Default: 0 decimal places |
+| `int` | `Str → Int` | Parse a string as an integer. Truncates decimals (`"3.9" → 3`) |
+| `uuid` | `() → Str` or `(version:Int) → Str` | Generate a UUID. Supported versions: `4` (random, default), `7` (time-ordered, sortable) |
 
 Functions that take a pipe receiver (`trim`, `lower`, `upper`, `len`, `replace`, `default`) must be used after `|`:
 
@@ -165,12 +215,40 @@ Functions that take a pipe receiver (`trim`, `lower`, `upper`, `len`, `replace`,
 CLEAN = "${{ $RAW | trim | lower }}"
 ```
 
-Functions that do not take a pipe receiver (`concat`, `eq`) are called directly:
+Functions that do not take a pipe receiver (`concat`, `eq`, `now`) are called directly:
 
 ```env
-BOTH   = "${{ concat($FIRST, ' ', $LAST) }}"
-IS_PROD = "${{ eq($APP_ENV, 'prod') }}"
+BOTH      = "${{ concat($FIRST, ' ', $LAST) }}"
+IS_PROD   = "${{ eq($APP_ENV, 'prod') }}"
+BUILT_AT  = "${{ now() }}"
+BUILD_TAG = "${{ now('YYYYMMDD') }}"
+API_KEY      = "${{ secret() }}"
+TOKEN        = "${{ secret(64) }}"
+HEX_TOKEN    = "${{ secret(32, 'hex') }}"
+B64_TOKEN    = "${{ secret(32, 'base64url') }}"
+PIN          = "${{ secret(6, 'numeric') }}"
+CUSTOM_TOKEN = "${{ secret(16, 'abcdef0123456789') }}"
 ```
+
+### `now()` format tokens
+
+| Token  | Meaning            | Example   |
+|--------|--------------------|-----------|
+| `YYYY` | 4-digit year       | `2026`    |
+| `YY`   | 2-digit year       | `26`      |
+| `MMMM` | Full month name    | `January` |
+| `MMM`  | Short month name   | `Jan`     |
+| `MM`   | 2-digit month      | `06`      |
+| `DDDD` | Full weekday name  | `Monday`  |
+| `DDD`  | Short weekday name | `Mon`     |
+| `DD`   | 2-digit day        | `28`      |
+| `HH`   | 24-hour hour       | `15`      |
+| `hh`   | 12-hour hour       | `03`      |
+| `mm`   | Minutes            | `30`      |
+| `ss`   | Seconds            | `00`      |
+| `A`    | AM/PM marker       | `PM`      |
+
+Tokens not listed above are passed through unchanged, so separators like `-`, `:`, and `T` work as-is.
 
 ---
 
@@ -195,6 +273,17 @@ envx run app.envx -- npm start
 envx run staging.envx -- ./deploy.sh
 ```
 
+### `envx print <file.envx>`
+
+Evaluate the file and print each variable as a plain `KEY=VALUE` line — no `export`, no quoting. Useful for piping into other tools.
+
+```sh
+$ envx print app.envx
+APP_ENV=prod
+USERNAME=alice_smith
+PORT=3000
+```
+
 ### `envx eval '<expression>'`
 
 Evaluate a single expression. Variable references (`$NAME`) resolve against the current OS environment, making this useful for quick debugging.
@@ -208,6 +297,9 @@ HELLO-WORLD
 
 $ envx eval "if eq('prod', 'prod') then 'yes' else 'no'"
 yes
+
+$ envx eval "now('YYYY-MM-DD')"
+2026-06-28
 ```
 
 > **Note:** Use shell single quotes around expressions that contain `$` to prevent the shell from expanding them before `envx` sees them.
@@ -252,7 +344,7 @@ envx::load::duplicate_var
 envx::eval::unknown_fn
 
   × unknown function `frobulate`
-  help: allowed functions: trim, lower, upper, replace, concat, default, eq, len
+  help: allowed functions: trim, lower, upper, replace, concat, default, eq, len, now
 ```
 
 ---

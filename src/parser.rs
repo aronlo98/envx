@@ -117,8 +117,8 @@ impl<'s> FileParser<'s> {
             });
         }
 
-        // Consume the string value
-        let (val_tok, val_span) = self.require_next("string value")?;
+        // Consume the value — either a quoted string or a bare unquoted word.
+        let (val_tok, val_span) = self.require_next("value")?;
         match val_tok {
             FileToken::StringContent(raw) => {
                 self.skip_newline();
@@ -133,8 +133,39 @@ impl<'s> FileParser<'s> {
                     span: key_span.merge(val_span),
                 })
             }
+            // Bare (unquoted) value: `ENV = development`, `PORT = 8080`, etc.
+            // Collect consecutive non-Newline tokens and reconstruct the full
+            // text from source byte offsets (spaces are preserved this way even
+            // though logos skips them between tokens).
+            FileToken::Ident | FileToken::BareChunk => {
+                let val_start = val_span.start;
+                let mut val_end = val_span.end;
+                loop {
+                    match self.tokens.get(self.pos) {
+                        Some((FileToken::Newline, _))
+                        | Some((FileToken::Comment, _))
+                        | None => break,
+                        Some((_, span)) => {
+                            val_end = span.end;
+                            self.pos += 1;
+                        }
+                    }
+                }
+                self.skip_newline();
+                let raw = self.source[val_start..val_end].trim_end().to_string();
+                let template = Template {
+                    segments: vec![Segment::Literal(raw)],
+                    span: Span::new(val_start, val_end),
+                };
+                Ok(Statement::Entry {
+                    key,
+                    template,
+                    source: self.file_path.to_path_buf(),
+                    span: key_span.merge(Span::new(val_start, val_end)),
+                })
+            }
             other => Err(EnvxError::UnexpectedToken {
-                expected: "string value".into(),
+                expected: "value (quoted string or bare word)".into(),
                 found: format!("{:?}", other),
                 src: self.named(),
                 span: val_span.into(),
@@ -731,6 +762,39 @@ mod tests {
         } else {
             panic!("expected Import");
         }
+    }
+
+    // ── Bare (unquoted) values ────────────────────────────────────────────────
+
+    #[test]
+    fn bare_word_value() {
+        let (key, tmpl) = first_entry("ENV = development\n");
+        assert_eq!(key, "ENV");
+        assert!(matches!(&tmpl.segments[0], Segment::Literal(s) if s == "development"));
+    }
+
+    #[test]
+    fn bare_numeric_value() {
+        let (_, tmpl) = first_entry("PORT = 8080\n");
+        assert!(matches!(&tmpl.segments[0], Segment::Literal(s) if s == "8080"));
+    }
+
+    #[test]
+    fn bare_value_with_special_chars() {
+        let (_, tmpl) = first_entry("HOST = localhost:8080\n");
+        assert!(matches!(&tmpl.segments[0], Segment::Literal(s) if s == "localhost:8080"));
+    }
+
+    #[test]
+    fn bare_multiword_value() {
+        let (_, tmpl) = first_entry("GREETING = hello world\n");
+        assert!(matches!(&tmpl.segments[0], Segment::Literal(s) if s == "hello world"));
+    }
+
+    #[test]
+    fn bare_value_stops_at_comment() {
+        let (_, tmpl) = first_entry("ENV = production # this is prod\n");
+        assert!(matches!(&tmpl.segments[0], Segment::Literal(s) if s == "production"));
     }
 
     // ── Error cases ───────────────────────────────────────────────────────────

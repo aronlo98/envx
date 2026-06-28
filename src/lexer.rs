@@ -27,7 +27,7 @@ pub enum FileToken {
 
     /// A bare identifier: the variable key (e.g. `APP_ENV`) or other unquoted
     /// word. Matches `[A-Za-z_][A-Za-z0-9_]*`.
-    #[regex(r"[A-Za-z_][A-Za-z0-9_]*")]
+    #[regex(r"[A-Za-z_][A-Za-z0-9_]*", priority = 3)]
     Ident,
 
     /// The `=` assignment operator.
@@ -46,6 +46,20 @@ pub enum FileToken {
     /// which logos converts to `Err(())` on that token.
     #[token("\"", scan_string)]
     StringContent(String),
+
+    /// A bare (unquoted) value token.
+    ///
+    /// Matches any non-whitespace sequence that does not start with `"` or `#`.
+    /// Used to support unquoted values such as `ENV = development` or
+    /// `PORT = 8080`. For purely alphabetic tokens, `Ident` is listed first and
+    /// wins (same length); `BareChunk` wins when the value contains characters
+    /// that `Ident` cannot match (digits, `:`, `.`, `/`, `-`, etc.).
+    ///
+    /// In the parser, `Ident` and `BareChunk` in value position are both treated
+    /// as literal string values; consecutive tokens are merged via source spans so
+    /// that `KEY = hello world` produces `"hello world"` (spaces preserved).
+    #[regex("[^\"#\\n\\t\\r =][^\\n\\t\\r ]*")]
+    BareChunk,
 
     /// A line comment beginning with `#`. The entire comment text (including
     /// the `#`) is consumed and discarded — comments carry no semantics.

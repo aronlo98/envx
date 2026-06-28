@@ -139,6 +139,36 @@ impl Expr {
             }
         }
     }
+
+    /// Finds if the given byte offset falls inside a `VarRef` expression.
+    /// Used by the LSP to support "Go to Definition" for variables.
+    pub fn find_var_ref_at(&self, offset: usize) -> Option<String> {
+        let s = self.span();
+        if offset < s.start || offset > s.end {
+            return None;
+        }
+
+        match self {
+            Expr::VarRef { name, span } => {
+                if offset >= span.start && offset <= span.end {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            }
+            Expr::Pipe { expr, func, .. } => {
+                expr.find_var_ref_at(offset).or_else(|| {
+                    func.args.iter().find_map(|arg| arg.find_var_ref_at(offset))
+                })
+            }
+            Expr::Call(f) => f.args.iter().find_map(|arg| arg.find_var_ref_at(offset)),
+            Expr::IfExpr { cond, then_val, else_val, .. } => cond
+                .find_var_ref_at(offset)
+                .or_else(|| then_val.find_var_ref_at(offset))
+                .or_else(|| else_val.find_var_ref_at(offset)),
+            _ => None,
+        }
+    }
 }
 
 // ─── Template (value of one assignment) ──────────────────────────────────────
@@ -180,6 +210,20 @@ impl Template {
         }
         refs
     }
+
+    /// Finds a variable reference at the given byte offset within this template.
+    pub fn find_var_ref_at(&self, offset: usize) -> Option<String> {
+        if offset < self.span.start || offset > self.span.end {
+            return None;
+        }
+        self.segments.iter().find_map(|seg| {
+            if let Segment::Expr(expr) = seg {
+                expr.find_var_ref_at(offset)
+            } else {
+                None
+            }
+        })
+    }
 }
 
 // ─── File-level AST ───────────────────────────────────────────────────────────
@@ -218,6 +262,19 @@ pub struct EnvxFile {
     pub source: String,
     /// Statements in declaration order.
     pub statements: Vec<Statement>,
+}
+
+impl EnvxFile {
+    /// Finds a variable reference at the given byte offset across all statements.
+    pub fn find_var_ref_at(&self, offset: usize) -> Option<String> {
+        self.statements.iter().find_map(|stmt| {
+            if let Statement::Entry { template, .. } = stmt {
+                template.find_var_ref_at(offset)
+            } else {
+                None
+            }
+        })
+    }
 }
 
 // ─── Resolved environment ─────────────────────────────────────────────────────

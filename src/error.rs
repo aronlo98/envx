@@ -114,7 +114,7 @@ pub enum EnvxError {
     #[error("unknown function `{name}`")]
     #[diagnostic(
         code(envx::eval::unknown_fn),
-        help("allowed functions: trim, lower, upper, replace, concat, default, eq, len")
+        help("allowed functions: abs, capitalize, concat, default, emoji, eq, int, len, lower, now, replace, round, secret, title, trim, truncate, upper, uuid")
     )]
     UnknownFunction { name: String },
 
@@ -133,6 +133,10 @@ pub enum EnvxError {
         expected: String,
         got: String,
     },
+
+    #[error("invalid argument for `{func}`: {message}")]
+    #[diagnostic(code(envx::eval::invalid_arg))]
+    InvalidArgument { func: String, message: String },
 
     // ── I/O ───────────────────────────────────────────────────────────────────
 

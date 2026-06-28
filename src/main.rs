@@ -1,5 +1,6 @@
 mod ast;
 mod builtins;
+mod cli;
 mod dag;
 mod error;
 mod evaluator;
@@ -8,58 +9,17 @@ mod loader;
 mod parser;
 mod value;
 
-use std::{path::PathBuf, process};
+use std::{io, path::PathBuf, process};
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser};
+use clap_complete::generate;
 use indexmap::IndexMap;
 use miette::Report;
 
 use ast::{ResolvedEnv, Segment, Span, Statement, Template};
+use cli::{Cli, Commands, ShellChoice};
 use error::{EnvxError, Result};
 use value::Value;
-
-// ─── CLI definitions ──────────────────────────────────────────────────────────
-
-#[derive(Parser)]
-#[command(
-    name = "envx",
-    version,
-    about = "Modern .envx processor — dynamic variables, pipe functions, imports"
-)]
-struct Cli {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand)]
-enum Commands {
-    /// Evaluate a .envx file and run a command with those variables injected
-    Run {
-        /// Path to the .envx file
-        file: PathBuf,
-
-        /// Command and arguments (use `--` to separate from envx options)
-        #[arg(trailing_var_arg = true, required = true, value_name = "CMD")]
-        cmd: Vec<String>,
-    },
-
-    /// Print all variables as `export KEY="VALUE"` statements
-    ///
-    /// Typical use:  eval $(envx export app.envx)
-    Export {
-        /// Path to the .envx file
-        file: PathBuf,
-    },
-
-    /// Evaluate a single expression using OS environment for variable references
-    ///
-    /// Example:  envx eval '$HOME | lower'
-    Eval {
-        /// The expression to evaluate
-        #[arg(value_name = "EXPR")]
-        expr: String,
-    },
-}
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 
@@ -69,6 +29,11 @@ fn main() {
         Commands::Run { file, cmd } => cmd_run(file, cmd),
         Commands::Export { file } => cmd_export(file),
         Commands::Eval { expr } => cmd_eval(expr),
+        Commands::Print { file } => cmd_print(file),
+        Commands::Completions { shell } => {
+            cmd_completions(shell);
+            return;
+        }
     };
 
     if let Err(e) = result {
@@ -110,6 +75,25 @@ fn cmd_export(file: PathBuf) -> Result<()> {
     Ok(())
 }
 
+// ─── Subcommand: print ───────────────────────────────────────────────────────
+
+fn cmd_print(file: PathBuf) -> Result<()> {
+    let rows: Vec<(String, String)> = load_and_eval(&file)?
+        .into_iter()
+        .map(|(k, v)| (k, v.into_string()))
+        .collect();
+
+    let key_w = rows.iter().map(|(k, _)| k.len()).max().unwrap_or(0).max("KEY".len());
+    let val_w = rows.iter().map(|(_, v)| v.len()).max().unwrap_or(0).max("VALUE".len());
+
+    println!("{:<key_w$} | {:<val_w$}", "KEY", "VALUE");
+    println!("{:-<key_w$}-+-{:-<val_w$}", "", "");
+    for (key, val) in rows {
+        println!("{key:<key_w$} | {val}");
+    }
+    Ok(())
+}
+
 // ─── Subcommand: eval ─────────────────────────────────────────────────────────
 
 fn cmd_eval(expr: String) -> Result<()> {
@@ -147,6 +131,21 @@ fn cmd_eval(expr: String) -> Result<()> {
 
     Ok(())
 }
+
+// ─── Subcommand: completions ──────────────────────────────────────────────────
+
+fn cmd_completions(shell: ShellChoice) {
+    let mut cmd = Cli::command();
+    let shell = match shell {
+        ShellChoice::Bash => clap_complete::Shell::Bash,
+        ShellChoice::Zsh => clap_complete::Shell::Zsh,
+        ShellChoice::Fish => clap_complete::Shell::Fish,
+        ShellChoice::PowerShell => clap_complete::Shell::PowerShell,
+    };
+    generate(shell, &mut cmd, "envx", &mut io::stdout());
+}
+
+
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
