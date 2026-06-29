@@ -40,6 +40,7 @@ DB_HOST  = "${{ if eq($APP_ENV, 'prod') then 'api.db.com' else 'localhost' }}"
 ```
 
 ### Rules
+- **Section headers**: `[SectionName]` to group variables. `SectionName` must match `[A-Za-z_][A-Za-z0-9_]*`.
 - One assignment per line: `KEY = "value"`
 - `KEY` must match `[A-Za-z_][A-Za-z0-9_]*`
 - Everything outside `${{ }}` is literal text
@@ -159,6 +160,7 @@ pub enum Segment { Literal(String), Expr(Expr) }
 pub struct Template { pub segments: Vec<Segment>, pub span: Span }
 
 pub enum Statement {
+    Section { name: String, span: Span },
     Import { raw_path: String, resolved: PathBuf, span: Span },
     Entry  { key: String, template: Template, source: PathBuf, span: Span },
 }
@@ -412,8 +414,12 @@ envx eval  '<expression>'
     Evaluate a single expression for debugging. Reads OS environment for $VARs.
     Example: envx eval '$HOME | lower'
 
-envx print <file.envx>
+envx print <file.envx> [--tags]
     Parse and print the resolved variables without executing a command.
+    With --tags, groups variables by their [SectionName] tag.
+
+envx fmt   <file.envx> [--check]
+    Format the file, aligning '=' signs and normalizing whitespace in template blocks.
 
 envx completions <shell>
     Generate shell completion scripts (bash, zsh, fish, powershell).
