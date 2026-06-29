@@ -53,10 +53,14 @@ pub enum Commands {
     /// Print all resolved variables as KEY=VALUE pairs
     ///
     /// Example:  envx print app.envx
-    ///           envx print app.envx > .env
+    ///           envx print --tags app.envx
     Print {
         /// Path to the .envx file
         file: PathBuf,
+
+        /// Show a TAG column and sort rows by tag name ascending
+        #[arg(long, short = 't')]
+        tags: bool,
     },
 
     /// Print the shell completion script for the given shell
@@ -66,5 +70,16 @@ pub enum Commands {
         shell: ShellChoice,
     },
 
+    /// Format a .envx file — aligns `=` across all assignments
+    ///
+    /// Example:  envx fmt app.envx
+    ///           envx fmt --check app.envx
+    Fmt {
+        /// Path to the .envx file
+        file: PathBuf,
 
+        /// Exit with a non-zero code if the file is not already formatted (useful in CI)
+        #[arg(long)]
+        check: bool,
+    },
 }

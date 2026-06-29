@@ -30,6 +30,7 @@ Register-ArgumentCompleter -Native -CommandName 'envx' -ScriptBlock {
             [CompletionResult]::new('eval', 'eval', [CompletionResultType]::ParameterValue, 'Evaluate a single expression using OS environment for variable references')
             [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Print all resolved variables as KEY=VALUE pairs')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Print the shell completion script for the given shell')
+            [CompletionResult]::new('fmt', 'fmt', [CompletionResultType]::ParameterValue, 'Format a .envx file — aligns `=` across all assignments')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -49,11 +50,19 @@ Register-ArgumentCompleter -Native -CommandName 'envx' -ScriptBlock {
             break
         }
         'envx;print' {
+            [CompletionResult]::new('-t', '-t', [CompletionResultType]::ParameterName, 'Show a TAG column and sort rows by tag name ascending')
+            [CompletionResult]::new('--tags', '--tags', [CompletionResultType]::ParameterName, 'Show a TAG column and sort rows by tag name ascending')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             break
         }
         'envx;completions' {
+            [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
+            break
+        }
+        'envx;fmt' {
+            [CompletionResult]::new('--check', '--check', [CompletionResultType]::ParameterName, 'Exit with a non-zero code if the file is not already formatted (useful in CI)')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             break
@@ -64,6 +73,7 @@ Register-ArgumentCompleter -Native -CommandName 'envx' -ScriptBlock {
             [CompletionResult]::new('eval', 'eval', [CompletionResultType]::ParameterValue, 'Evaluate a single expression using OS environment for variable references')
             [CompletionResult]::new('print', 'print', [CompletionResultType]::ParameterValue, 'Print all resolved variables as KEY=VALUE pairs')
             [CompletionResult]::new('completions', 'completions', [CompletionResultType]::ParameterValue, 'Print the shell completion script for the given shell')
+            [CompletionResult]::new('fmt', 'fmt', [CompletionResultType]::ParameterValue, 'Format a .envx file — aligns `=` across all assignments')
             [CompletionResult]::new('help', 'help', [CompletionResultType]::ParameterValue, 'Print this message or the help of the given subcommand(s)')
             break
         }
@@ -80,6 +90,9 @@ Register-ArgumentCompleter -Native -CommandName 'envx' -ScriptBlock {
             break
         }
         'envx;help;completions' {
+            break
+        }
+        'envx;help;fmt' {
             break
         }
         'envx;help;help' {

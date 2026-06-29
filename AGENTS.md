@@ -359,26 +359,44 @@ pub fn evaluate(env: &ResolvedEnv, order: &[String]) -> Result<HashMap<String, V
 
 ---
 
-## Builtins Whitelist (TODO)
+## Builtins Whitelist
 
 All functions are pure (no side effects, no I/O). `src/builtins.rs` dispatches by name:
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `trim` | `(Str) → Str` | Strip leading/trailing whitespace |
-| `lower` | `(Str) → Str` | ASCII lowercase |
-| `upper` | `(Str) → Str` | ASCII uppercase |
-| `replace` | `(Str, Str, Str) → Str` | Replace first arg in value with second |
+| `abs` | `(Int) → Int` | Absolute value |
+| `capitalize` | `(Str) → Str` | Capitalize first letter |
 | `concat` | `(Str, Str, ...) → Str` | Concatenate strings |
+| `date_add` | `(Str, Int, Str) → Str` | Add offset to date (e.g. days) |
+| `date_diff` | `(Str, Str, Str) → Int` | Difference between dates |
+| `date_format` | `(Str, Str) → Str` | Format date string |
+| `day` | `(Str) → Int` | Extract day of month |
 | `default` | `(Any, Any) → Any` | Return first arg if truthy, else second |
+| `emoji` | `(Str) → Str` | Lookup emoji by name |
 | `eq` | `(Any, Any) → Bool` | Structural equality |
+| `int` | `(Str) → Int` | Parse integer |
 | `len` | `(Str) → Int` | String length |
+| `lower` | `(Str) → Str` | ASCII lowercase |
+| `month` | `(Str) → Int` | Extract month |
+| `now` | `([Str]) → Str` | Current timestamp (optional format) |
+| `replace` | `(Str, Str, Str) → Str` | Replace first arg in value with second |
+| `round` | `(Str, [Int]) → Str` | Round number to decimals |
+| `secret` | `([Int], [Str]) → Str` | Generate random string |
+| `timestamp` | `() → Int` | Current UNIX timestamp |
+| `title` | `(Str) → Str` | Title case |
+| `trim` | `(Str) → Str` | Strip leading/trailing whitespace |
+| `truncate` | `(Str, Int) → Str` | Truncate string to length |
+| `upper` | `(Str) → Str` | ASCII uppercase |
+| `uuid` | `([Int]) → Str` | Generate UUID (v4 or v7) |
+| `weekday` | `(Str) → Str` | Extract day of week name |
+| `year` | `(Str) → Int` | Extract year |
 
 Any other function name → `EnvxError::UnknownFunction`.
 
 ---
 
-## CLI Commands (TODO — `src/main.rs`)
+## CLI Commands (`src/main.rs`)
 
 ```
 envx run   <file.envx> [--] <cmd> [args...]
@@ -393,6 +411,12 @@ envx export <file.envx>
 envx eval  '<expression>'
     Evaluate a single expression for debugging. Reads OS environment for $VARs.
     Example: envx eval '$HOME | lower'
+
+envx print <file.envx>
+    Parse and print the resolved variables without executing a command.
+
+envx completions <shell>
+    Generate shell completion scripts (bash, zsh, fish, powershell).
 ```
 
 ---
@@ -410,8 +434,17 @@ envx eval  '<expression>'
 | `src/loader.rs` | ✅ Done | `load()`, DFS con `visit_stack`+`loaded`, merge con error en redefinición + 17 tests |
 | `src/dag.rs` | ✅ Done | Kahn's BFS sort (stable order), `kosaraju_scc` for cycle path + 7 tests |
 | `src/evaluator.rs` | ✅ Done | `evaluate()`, memoization, full `Expr` dispatch + 16 tests |
-| `src/builtins.rs` | ✅ Done | 8 whitelisted functions (`trim/lower/upper/len/replace/concat/default/eq`) + 14 tests |
-| `src/main.rs` | ✅ Done | clap CLI: `run`, `export`, `eval` subcommands + miette error reporting |
+| `src/builtins.rs` | ✅ Done | 26 whitelisted functions (`trim/lower/upper/len/replace/concat/default/eq/date_add/etc...`) |
+| `src/main.rs` | ✅ Done | clap CLI: `run`, `export`, `eval`, `print`, `completions` + miette error reporting |
+
+---
+
+## Release Process
+
+- The project uses GitHub Actions for an automated release process.
+- The release workflow is triggered automatically upon pushing a Git tag that starts with `v*` (e.g., `v0.1.2`).
+- Binary artifacts are built for multiple platforms, packaged into `.tar.gz` with their shell completions, and attached to a GitHub Release.
+
 
 ---
 

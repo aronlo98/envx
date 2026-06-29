@@ -275,11 +275,15 @@ Tokens not listed above are passed through unchanged, so separators like `-`, `:
 
 ### `envx export <file.envx>`
 
-Evaluate the file and print each variable as a shell `export` statement. Suitable for use with `eval`:
+Evaluate the file and print each variable as a shell `export` statement. Suitable for use with `eval` or `source`:
 
 ```sh
+# Load into the current shell session
 eval $(envx export app.envx)
 echo $DB_HOST
+
+# Alternative — same effect, no eval
+source <(envx export app.envx)
 ```
 
 ### `envx run <file.envx> -- <command> [args...]`
@@ -301,6 +305,37 @@ $ envx print app.envx
 APP_ENV=prod
 USERNAME=alice_smith
 PORT=3000
+```
+
+### `envx fmt <file.envx>`
+
+Format a `.envx` file in-place — aligns `=` across all assignments to the width of the longest key.
+
+```sh
+$ envx fmt app.envx
+formatted: app.envx
+```
+
+Before:
+```env
+APP_ENV="prod"
+BUILT_AT="${{ now('YYYY') }}"
+TOKEN="${{ secret(64) }}"
+HEX_TOKEN =    "${{ secret(32, 'hex') }}"
+```
+
+After:
+```env
+APP_ENV   = "prod"
+BUILT_AT  = "${{ now('YYYY') }}"
+TOKEN     = "${{ secret(64) }}"
+HEX_TOKEN = "${{ secret(32, 'hex') }}"
+```
+
+Use `--check` to verify formatting without modifying the file (useful in CI):
+
+```sh
+envx fmt --check app.envx
 ```
 
 ### `envx eval '<expression>'`

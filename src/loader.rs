@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    ast::{ResolvedEnv, Statement},
+    ast::{LayoutItem, ResolvedEnv, Statement},
     error::{EnvxError, Result},
     parser::parse,
 };
@@ -84,6 +84,9 @@ fn load_recursive(
                 let canonical = fs_canonicalize(&resolved, Some(&raw_path))?;
                 load_recursive(&canonical, visit_stack, loaded, env)?;
             }
+            Statement::Section { name, .. } => {
+                env.layout.push(LayoutItem::Section(name));
+            }
             Statement::Entry { key, template, source: src_file, .. } => {
                 if let Some((_, first)) = env.entries.get(&key) {
                     return Err(EnvxError::DuplicateVariable {
@@ -92,6 +95,7 @@ fn load_recursive(
                         second_file: src_file.display().to_string(),
                     });
                 }
+                env.layout.push(LayoutItem::Entry(key.clone()));
                 env.entries.insert(key, (template, src_file));
             }
         }

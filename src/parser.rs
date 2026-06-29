@@ -9,6 +9,7 @@ use crate::{
     value::Value,
 };
 
+
 // ─── Public entry point ───────────────────────────────────────────────────────
 
 /// Parse a `.envx` source string into an `EnvxFile` AST.
@@ -60,6 +61,11 @@ impl<'s> FileParser<'s> {
                 FileToken::Import => {
                     self.pos += 1;
                     stmts.push(self.parse_import(span)?);
+                }
+                FileToken::Section(name) => {
+                    self.pos += 1;
+                    self.skip_newline();
+                    stmts.push(Statement::Section { name, span });
                 }
                 FileToken::Ident => {
                     // The key text lives in the source at the token's span.

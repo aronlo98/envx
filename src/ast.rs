@@ -242,6 +242,12 @@ pub enum Statement {
         span: Span,
     },
 
+    /// `[section_name]` — a grouping label. Has no effect on evaluation.
+    Section {
+        name: String,
+        span: Span,
+    },
+
     /// `KEY = "value"` or `KEY = "${{ expr }}"`
     Entry {
         key: String,
@@ -251,6 +257,17 @@ pub enum Statement {
         source: PathBuf,
         span: Span,
     },
+}
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
+/// An item in the display layout of a resolved environment.
+/// Sections are stripped from `ResolvedEnv::entries` (they have no evaluation
+/// semantics) but stored here so that `envx print` can render group headers.
+#[derive(Debug, Clone)]
+pub enum LayoutItem {
+    Section(String),
+    Entry(String),
 }
 
 /// The parsed representation of a single `.envx` file.
@@ -300,4 +317,10 @@ pub struct ResolvedEnv {
     /// Populated by the loader and used by the evaluator to provide
     /// source-context spans in `UndefinedVariable` diagnostics.
     pub sources: HashMap<PathBuf, String>,
+
+    /// Ordered display layout: sections interleaved with entry keys.
+    /// Used by `envx print` to render group headers at the right positions.
+    /// Entries from `@import`ed files appear in DFS order without section headers
+    /// (sections are scoped to the file that declares them).
+    pub layout: Vec<LayoutItem>,
 }

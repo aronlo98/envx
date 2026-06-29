@@ -47,6 +47,16 @@ pub enum FileToken {
     #[token("\"", scan_string)]
     StringContent(String),
 
+    /// A section header `[name]` that groups variables visually.
+    /// Has no effect on evaluation — purely organisational.
+    ///
+    /// The associated `String` is the name between the brackets.
+    #[regex(r"\[[A-Za-z_][A-Za-z0-9_]*\]", |lex| {
+        let s = lex.slice();
+        s[1..s.len() - 1].to_string()
+    }, priority = 5)]
+    Section(String),
+
     /// A bare (unquoted) value token.
     ///
     /// Matches any non-whitespace sequence that does not start with `"` or `#`.

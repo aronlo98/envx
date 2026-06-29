@@ -25,6 +25,9 @@ _envx() {
             envx,export)
                 cmd="envx__subcmd__export"
                 ;;
+            envx,fmt)
+                cmd="envx__subcmd__fmt"
+                ;;
             envx,help)
                 cmd="envx__subcmd__help"
                 ;;
@@ -43,6 +46,9 @@ _envx() {
             envx__subcmd__help,export)
                 cmd="envx__subcmd__help__subcmd__export"
                 ;;
+            envx__subcmd__help,fmt)
+                cmd="envx__subcmd__help__subcmd__fmt"
+                ;;
             envx__subcmd__help,help)
                 cmd="envx__subcmd__help__subcmd__help"
                 ;;
@@ -59,7 +65,7 @@ _envx() {
 
     case "${cmd}" in
         envx)
-            opts="-h -V --help --version run export eval print completions help"
+            opts="-h -V --help --version run export eval print completions fmt help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -114,8 +120,22 @@ _envx() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        envx__subcmd__fmt)
+            opts="-h --check --help <FILE>"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         envx__subcmd__help)
-            opts="run export eval print completions help"
+            opts="run export eval print completions fmt help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -157,6 +177,20 @@ _envx() {
             return 0
             ;;
         envx__subcmd__help__subcmd__export)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        envx__subcmd__help__subcmd__fmt)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -213,7 +247,7 @@ _envx() {
             return 0
             ;;
         envx__subcmd__print)
-            opts="-h --help <FILE>"
+            opts="-t -h --tags --help <FILE>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
