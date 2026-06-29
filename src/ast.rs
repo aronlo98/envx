@@ -142,6 +142,7 @@ impl Expr {
 
     /// Finds if the given byte offset falls inside a `VarRef` expression.
     /// Used by the LSP to support "Go to Definition" for variables.
+    #[allow(dead_code)]
     pub fn find_var_ref_at(&self, offset: usize) -> Option<String> {
         let s = self.span();
         if offset < s.start || offset > s.end {
@@ -212,6 +213,7 @@ impl Template {
     }
 
     /// Finds a variable reference at the given byte offset within this template.
+    #[allow(dead_code)]
     pub fn find_var_ref_at(&self, offset: usize) -> Option<String> {
         if offset < self.span.start || offset > self.span.end {
             return None;
@@ -266,6 +268,7 @@ pub struct EnvxFile {
 
 impl EnvxFile {
     /// Finds a variable reference at the given byte offset across all statements.
+    #[allow(dead_code)]
     pub fn find_var_ref_at(&self, offset: usize) -> Option<String> {
         self.statements.iter().find_map(|stmt| {
             if let Statement::Entry { template, .. } = stmt {

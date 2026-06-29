@@ -1,6 +1,6 @@
 [package]
 name = "envx"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "A modern dotenv replacement — dynamic variables, pipe transforms, conditionals, and file imports"
 license = "MIT"
@@ -22,7 +22,7 @@ clap = { version = "4", features = ["derive"] }
 logos = "0.14"
 
 # DAG construction, cycle detection, topological sort
-petgraph = "0.6"
+petgraph = "0.8"
 
 # Human-friendly error reports with source spans
 miette = { version = "7", features = ["fancy"] }
@@ -40,7 +40,7 @@ clap_complete = "4"
 chrono = { version = "0.4", features = ["clock"] }
 
 # Random value generation for secret()
-rand = "0.8"
+rand = "0.9"
 
 # UUID generation for uuid()
 uuid = { version = "1", features = ["v4", "v7"] }

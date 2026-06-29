@@ -114,7 +114,7 @@ pub enum EnvxError {
     #[error("unknown function `{name}`")]
     #[diagnostic(
         code(envx::eval::unknown_fn),
-        help("allowed functions: abs, capitalize, concat, default, emoji, eq, int, len, lower, now, replace, round, secret, title, trim, truncate, upper, uuid")
+        help("allowed functions: abs, capitalize, concat, date_add, date_diff, date_format, day, default, emoji, eq, int, len, lower, month, now, replace, round, secret, timestamp, title, trim, truncate, upper, uuid, weekday, year")
     )]
     UnknownFunction { name: String },
 

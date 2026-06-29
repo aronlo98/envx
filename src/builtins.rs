@@ -1,4 +1,4 @@
-use chrono::Local;
+use chrono::{Datelike, Local, Months, NaiveDate, NaiveDateTime, Weekday};
 use rand::Rng;
 use uuid::Uuid;
 
@@ -267,6 +267,115 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
             }
             Ok(Value::Str("aronlo98 🐼".to_string()))
         }
+        // ── Date functions ────────────────────────────────────────────────────
+        //
+        // All date pipe functions accept a date string as the pipe receiver
+        // in one of two formats:
+        //   • "YYYY-MM-DD"               (date only, time assumed 00:00:00)
+        //   • "YYYY-MM-DDTHH:MM:SS"      (full ISO 8601 datetime)
+        //
+        // Usage pattern:
+        //   now() | date_add(30, 'days') | date_format('YYYYMMDD')
+        //   now() | year()    now() | month()    now() | weekday()
+
+        "timestamp" => {
+            if recv.is_some() || !args.is_empty() {
+                return Err(EnvxError::ArityError {
+                    func: "timestamp".into(),
+                    expected: "no arguments".into(),
+                    got: args.len() + recv.is_some() as usize,
+                });
+            }
+            Ok(Value::Int(Local::now().timestamp()))
+        }
+        "date_add" => {
+            // $DATE | date_add(n, unit)  →  new date string (ISO datetime)
+            // Negative n subtracts. Units: seconds/minutes/hours/days/weeks/months/years
+            let date_str = require_recv_str(name, recv, &args, 2)?;
+            let n = match &args[0] {
+                Value::Int(n) => *n,
+                other => return Err(EnvxError::TypeError {
+                    func: name.to_string(),
+                    expected: "Int for argument 1 (amount)".to_string(),
+                    got: other.type_name().to_string(),
+                }),
+            };
+            let unit = match &args[1] {
+                Value::Str(s) => s.clone(),
+                other => return Err(EnvxError::TypeError {
+                    func: name.to_string(),
+                    expected: "Str for argument 2 (unit)".to_string(),
+                    got: other.type_name().to_string(),
+                }),
+            };
+            let dt = parse_date_str(&date_str, name)?;
+            let result = apply_date_offset(dt, n, &unit, name)?;
+            Ok(Value::Str(result.format("%Y-%m-%dT%H:%M:%S").to_string()))
+        }
+        "date_diff" => {
+            // $DATE1 | date_diff(date2, unit)  →  Int (date2 − date1 in unit)
+            // Result is negative when date2 is earlier than date1.
+            let date1_str = require_recv_str(name, recv, &args, 2)?;
+            let date2_str = match &args[0] {
+                Value::Str(s) => s.clone(),
+                other => return Err(EnvxError::TypeError {
+                    func: name.to_string(),
+                    expected: "Str for argument 1 (date2)".to_string(),
+                    got: other.type_name().to_string(),
+                }),
+            };
+            let unit = match &args[1] {
+                Value::Str(s) => s.clone(),
+                other => return Err(EnvxError::TypeError {
+                    func: name.to_string(),
+                    expected: "Str for argument 2 (unit)".to_string(),
+                    got: other.type_name().to_string(),
+                }),
+            };
+            let dt1 = parse_date_str(&date1_str, name)?;
+            let dt2 = parse_date_str(&date2_str, name)?;
+            Ok(Value::Int(calc_date_diff(dt1, dt2, &unit, name)?))
+        }
+        "date_format" => {
+            // $DATE | date_format('YYYY/MM/DD')  →  formatted string
+            // Accepts the same moment.js-style tokens as now().
+            let date_str = require_recv_str(name, recv, &args, 1)?;
+            let fmt = match &args[0] {
+                Value::Str(s) => to_strftime(s),
+                other => return Err(EnvxError::TypeError {
+                    func: name.to_string(),
+                    expected: "Str for argument 1 (format)".to_string(),
+                    got: other.type_name().to_string(),
+                }),
+            };
+            let dt = parse_date_str(&date_str, name)?;
+            Ok(Value::Str(dt.format(&fmt).to_string()))
+        }
+        "year" => {
+            let dt = parse_date_str(&require_recv_str(name, recv, &args, 0)?, name)?;
+            Ok(Value::Int(dt.year() as i64))
+        }
+        "month" => {
+            let dt = parse_date_str(&require_recv_str(name, recv, &args, 0)?, name)?;
+            Ok(Value::Int(dt.month() as i64))
+        }
+        "day" => {
+            let dt = parse_date_str(&require_recv_str(name, recv, &args, 0)?, name)?;
+            Ok(Value::Int(dt.day() as i64))
+        }
+        "weekday" => {
+            let dt = parse_date_str(&require_recv_str(name, recv, &args, 0)?, name)?;
+            let day_name = match dt.weekday() {
+                Weekday::Mon => "Monday",
+                Weekday::Tue => "Tuesday",
+                Weekday::Wed => "Wednesday",
+                Weekday::Thu => "Thursday",
+                Weekday::Fri => "Friday",
+                Weekday::Sat => "Saturday",
+                Weekday::Sun => "Sunday",
+            };
+            Ok(Value::Str(day_name.to_string()))
+        }
         "uuid" => {
             if recv.is_some() {
                 return Err(EnvxError::ArityError {
@@ -364,8 +473,8 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
             };
 
             let chars: Vec<char> = alphabet.chars().collect();
-            let mut rng = rand::thread_rng();
-            let s: String = (0..length).map(|_| chars[rng.gen_range(0..chars.len())]).collect();
+            let mut rng = rand::rng();
+            let s: String = (0..length).map(|_| chars[rng.random_range(0..chars.len())]).collect();
             Ok(Value::Str(s))
         }
 
@@ -434,6 +543,80 @@ fn resolve_alphabet(s: &str) -> &str {
         "alpha"     => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
         "numeric"   => "0123456789",
         other       => other,
+    }
+}
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+/// Parse a date string in `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SS` format.
+fn parse_date_str(s: &str, func: &str) -> Result<NaiveDateTime> {
+    NaiveDateTime::parse_from_str(s.trim(), "%Y-%m-%dT%H:%M:%S")
+        .or_else(|_| {
+            NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d")
+                .map(|d| d.and_hms_opt(0, 0, 0).unwrap())
+        })
+        .map_err(|_| EnvxError::InvalidArgument {
+            func: func.to_string(),
+            message: format!(
+                "cannot parse '{s}' as a date; use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
+            ),
+        })
+}
+
+/// Apply a signed offset to a `NaiveDateTime`.
+/// `unit` is normalised by stripping a trailing `s` so both `"day"` and
+/// `"days"` are accepted.
+fn apply_date_offset(dt: NaiveDateTime, n: i64, unit: &str, func: &str) -> Result<NaiveDateTime> {
+    use chrono::Duration;
+    let result = match unit.trim_end_matches('s') {
+        "second" => dt.checked_add_signed(Duration::seconds(n)),
+        "minute" => dt.checked_add_signed(Duration::minutes(n)),
+        "hour"   => dt.checked_add_signed(Duration::hours(n)),
+        "day"    => dt.checked_add_signed(Duration::days(n)),
+        "week"   => dt.checked_add_signed(Duration::weeks(n)),
+        "month"  => if n >= 0 {
+            dt.checked_add_months(Months::new(n as u32))
+        } else {
+            dt.checked_sub_months(Months::new((-n) as u32))
+        },
+        "year"   => if n >= 0 {
+            dt.checked_add_months(Months::new(n as u32 * 12))
+        } else {
+            dt.checked_sub_months(Months::new((-n) as u32 * 12))
+        },
+        _ => return Err(EnvxError::InvalidArgument {
+            func: func.to_string(),
+            message: format!(
+                "unknown unit '{unit}'; use: seconds, minutes, hours, days, weeks, months, years"
+            ),
+        }),
+    };
+    result.ok_or_else(|| EnvxError::InvalidArgument {
+        func: func.to_string(),
+        message: "date arithmetic overflow".to_string(),
+    })
+}
+
+/// Compute `dt2 − dt1` in the requested unit.
+fn calc_date_diff(dt1: NaiveDateTime, dt2: NaiveDateTime, unit: &str, func: &str) -> Result<i64> {
+    let dur = dt2.signed_duration_since(dt1);
+    match unit.trim_end_matches('s') {
+        "second" => Ok(dur.num_seconds()),
+        "minute" => Ok(dur.num_minutes()),
+        "hour"   => Ok(dur.num_hours()),
+        "day"    => Ok(dur.num_days()),
+        "week"   => Ok(dur.num_weeks()),
+        "month"  => Ok(
+            (dt2.year() - dt1.year()) as i64 * 12
+                + dt2.month() as i64 - dt1.month() as i64,
+        ),
+        "year"   => Ok((dt2.year() - dt1.year()) as i64),
+        _ => Err(EnvxError::InvalidArgument {
+            func: func.to_string(),
+            message: format!(
+                "unknown unit '{unit}'; use: seconds, minutes, hours, days, weeks, months, years"
+            ),
+        }),
     }
 }
 
@@ -738,6 +921,126 @@ mod tests {
     fn int_rejects_non_numeric() {
         assert!(matches!(
             dispatch("int", Some(s("abc")), vec![]),
+            Err(EnvxError::InvalidArgument { .. })
+        ));
+    }
+
+    // ── date functions ────────────────────────────────────────────────────────
+
+    #[test]
+    fn timestamp_returns_positive_int() {
+        let v = dispatch("timestamp", None, vec![]).unwrap();
+        assert!(matches!(v, Value::Int(n) if n > 0));
+    }
+
+    #[test]
+    fn date_add_days() {
+        let v = dispatch("date_add", Some(s("2026-06-28T00:00:00")), vec![Value::Int(5), s("days")]).unwrap();
+        assert_eq!(v, s("2026-07-03T00:00:00"));
+    }
+
+    #[test]
+    fn date_add_negative_subtracts() {
+        let v = dispatch("date_add", Some(s("2026-06-28T00:00:00")), vec![Value::Int(-7), s("days")]).unwrap();
+        assert_eq!(v, s("2026-06-21T00:00:00"));
+    }
+
+    #[test]
+    fn date_add_months() {
+        let v = dispatch("date_add", Some(s("2026-01-15T00:00:00")), vec![Value::Int(2), s("months")]).unwrap();
+        assert_eq!(v, s("2026-03-15T00:00:00"));
+    }
+
+    #[test]
+    fn date_add_years() {
+        let v = dispatch("date_add", Some(s("2026-06-28T00:00:00")), vec![Value::Int(1), s("years")]).unwrap();
+        assert_eq!(v, s("2027-06-28T00:00:00"));
+    }
+
+    #[test]
+    fn date_add_accepts_date_only_input() {
+        let v = dispatch("date_add", Some(s("2026-06-28")), vec![Value::Int(3), s("days")]).unwrap();
+        assert_eq!(v, s("2026-07-01T00:00:00"));
+    }
+
+    #[test]
+    fn date_add_rejects_unknown_unit() {
+        assert!(matches!(
+            dispatch("date_add", Some(s("2026-06-28")), vec![Value::Int(1), s("fortnight")]),
+            Err(EnvxError::InvalidArgument { .. })
+        ));
+    }
+
+    #[test]
+    fn date_diff_days_forward() {
+        let v = dispatch("date_diff",
+            Some(s("2026-06-28T00:00:00")),
+            vec![s("2026-07-08T00:00:00"), s("days")]).unwrap();
+        assert_eq!(v, Value::Int(10));
+    }
+
+    #[test]
+    fn date_diff_days_backward_is_negative() {
+        let v = dispatch("date_diff",
+            Some(s("2026-07-08T00:00:00")),
+            vec![s("2026-06-28T00:00:00"), s("days")]).unwrap();
+        assert_eq!(v, Value::Int(-10));
+    }
+
+    #[test]
+    fn date_diff_years() {
+        let v = dispatch("date_diff",
+            Some(s("2020-01-01T00:00:00")),
+            vec![s("2026-01-01T00:00:00"), s("years")]).unwrap();
+        assert_eq!(v, Value::Int(6));
+    }
+
+    #[test]
+    fn date_format_reformats() {
+        let v = dispatch("date_format", Some(s("2026-06-28T15:30:00")), vec![s("DD/MM/YYYY")]).unwrap();
+        assert_eq!(v, s("28/06/2026"));
+    }
+
+    #[test]
+    fn date_format_date_only_input() {
+        let v = dispatch("date_format", Some(s("2026-06-28")), vec![s("YYYYMMDD")]).unwrap();
+        assert_eq!(v, s("20260628"));
+    }
+
+    #[test]
+    fn year_extracts() {
+        assert_eq!(dispatch("year", Some(s("2026-06-28")), vec![]).unwrap(), Value::Int(2026));
+    }
+
+    #[test]
+    fn month_extracts() {
+        assert_eq!(dispatch("month", Some(s("2026-06-28")), vec![]).unwrap(), Value::Int(6));
+    }
+
+    #[test]
+    fn day_extracts() {
+        assert_eq!(dispatch("day", Some(s("2026-06-28")), vec![]).unwrap(), Value::Int(28));
+    }
+
+    #[test]
+    fn weekday_returns_full_name() {
+        let v = dispatch("weekday", Some(s("2026-06-28")), vec![]).unwrap();
+        let valid = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+        let out = match v { Value::Str(s) => s, _ => panic!() };
+        assert!(valid.contains(&out.as_str()), "unexpected: {out}");
+    }
+
+    #[test]
+    fn weekday_known_day() {
+        // 2026-01-01 is a Thursday
+        let v = dispatch("weekday", Some(s("2026-01-01")), vec![]).unwrap();
+        assert_eq!(v, s("Thursday"));
+    }
+
+    #[test]
+    fn parse_date_rejects_invalid() {
+        assert!(matches!(
+            dispatch("year", Some(s("not-a-date")), vec![]),
             Err(EnvxError::InvalidArgument { .. })
         ));
     }

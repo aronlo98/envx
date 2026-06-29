@@ -45,7 +45,7 @@ Plain `.env` files are static. Once your config grows past a handful of keys you
 ```sh
 git clone https://github.com/aronlo98/envx
 cd envx
-cargo install --path .
+make install
 ```
 
 ### Verify
@@ -208,6 +208,25 @@ All transformations go through a fixed whitelist. There are no user-defined func
 | `round` | `Str → Str` or `Str, decimals:Int → Str` | Round a numeric string. Default: 0 decimal places |
 | `int` | `Str → Int` | Parse a string as an integer. Truncates decimals (`"3.9" → 3`) |
 | `uuid` | `() → Str` or `(version:Int) → Str` | Generate a UUID. Supported versions: `4` (random, default), `7` (time-ordered, sortable) |
+| `timestamp` | `() → Int` | Current Unix timestamp in seconds (since epoch) |
+| `date_add` | `Str, n:Int, unit:Str → Str` | Add time to a date. Negative `n` subtracts. Units: `seconds`, `minutes`, `hours`, `days`, `weeks`, `months`, `years` (singular and plural both accepted) |
+| `date_diff` | `Str, date2:Str, unit:Str → Int` | Difference between two dates (`date2 − receiver`) in the given unit. Negative when `date2` is earlier |
+| `date_format` | `Str, fmt:Str → Str` | Reformat a date string using moment.js-style tokens (same as `now()`) |
+| `year` | `Str → Int` | Year component of a date |
+| `month` | `Str → Int` | Month component (1–12) |
+| `day` | `Str → Int` | Day of month (1–31) |
+| `weekday` | `Str → Str` | Full weekday name in English (`"Monday"` … `"Sunday"`) |
+
+All date pipe functions accept `"YYYY-MM-DD"` or `"YYYY-MM-DDTHH:MM:SS"` as input. `date_add` always outputs ISO datetime format; pipe through `date_format` to reformat.
+
+```env
+EXPIRES   = "${{ now() | date_add(90, 'days') | date_format('YYYY-MM-DD') }}"
+BUILD_TAG = "${{ now() | date_format('YYYYMMDD') }}"
+DAYS_LEFT = "${{ now() | date_diff('2027-01-01', 'days') }}"
+BUILT_TS  = "${{ timestamp() }}"
+YEAR      = "${{ now() | year() }}"
+WEEKDAY   = "${{ now() | weekday() }}"
+```
 
 Functions that take a pipe receiver (`trim`, `lower`, `upper`, `len`, `replace`, `default`) must be used after `|`:
 
@@ -344,7 +363,7 @@ envx::load::duplicate_var
 envx::eval::unknown_fn
 
   × unknown function `frobulate`
-  help: allowed functions: trim, lower, upper, replace, concat, default, eq, len, now
+  help: allowed functions: abs, capitalize, concat, date_add, date_diff, date_format, day, default, emoji, eq, int, len, lower, month, now, replace, round, secret, title, trim, truncate, upper, uuid, weekday, year
 ```
 
 ---
@@ -416,17 +435,18 @@ String map  — exported to the child process environment or printed to stdout
 
 ---
 
-## Building from source
+## Development
 
 ```sh
-# Debug build (faster compile, larger binary)
-cargo build
-
-# Release build (optimised, ~2× smaller binary via LTO + strip)
-cargo build --release
-
-# Run all tests
-cargo test
+make build      # debug build (fast compile)
+make release    # optimised build (LTO + strip)
+make test       # run all tests
+make lint       # clippy — warnings as errors
+make fmt        # format with rustfmt
+make check      # type-check without producing a binary
+make clean      # remove build artefacts
+make install    # install to ~/.cargo/bin
+make uninstall  # remove from ~/.cargo/bin
 ```
 
 ---
