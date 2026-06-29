@@ -33,10 +33,12 @@ complete -c envx -n "__fish_envx_needs_command" -f -a "print" -d 'Print all reso
 complete -c envx -n "__fish_envx_needs_command" -f -a "completions" -d 'Print the shell completion script for the given shell'
 complete -c envx -n "__fish_envx_needs_command" -f -a "fmt" -d 'Format a .envx file — aligns `=` across all assignments'
 complete -c envx -n "__fish_envx_needs_command" -f -a "help" -d 'Print this message or the help of the given subcommand(s)'
+complete -c envx -n "__fish_envx_using_subcommand run" -s t -l tag -d 'Only inject variables belonging to these section tags (repeatable: -t db -t app)' -r
 complete -c envx -n "__fish_envx_using_subcommand run" -s h -l help -d 'Print help'
 complete -c envx -n "__fish_envx_using_subcommand export" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c envx -n "__fish_envx_using_subcommand eval" -s h -l help -d 'Print help (see more with \'--help\')'
-complete -c envx -n "__fish_envx_using_subcommand print" -s t -l tags -d 'Show a TAG column and sort rows by tag name ascending'
+complete -c envx -n "__fish_envx_using_subcommand print" -s t -l tag -d 'Only show variables belonging to these section tags (repeatable: -t db -t app)' -r
+complete -c envx -n "__fish_envx_using_subcommand print" -s T -l tags -d 'Show a TAG column and sort rows by tag name ascending'
 complete -c envx -n "__fish_envx_using_subcommand print" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c envx -n "__fish_envx_using_subcommand completions" -s h -l help -d 'Print help (see more with \'--help\')'
 complete -c envx -n "__fish_envx_using_subcommand fmt" -l check -d 'Exit with a non-zero code if the file is not already formatted (useful in CI)'

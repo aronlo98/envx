@@ -5,10 +5,9 @@ use miette::NamedSource;
 use crate::{
     ast::{EnvxFile, Expr, FnCall, Segment, Span, Statement, Template},
     error::{EnvxError, Result},
-    lexer::{lex_expr, lex_file, ExprToken, FileToken, Spanned},
+    lexer::{ExprToken, FileToken, Spanned, lex_expr, lex_file},
     value::Value,
 };
-
 
 // ─── Public entry point ───────────────────────────────────────────────────────
 
@@ -25,7 +24,11 @@ pub fn parse(source: &str, filename: &str, file_path: PathBuf) -> Result<EnvxFil
     let tokens = lex_file(source, filename)?;
     let mut p = FileParser::new(&tokens, source, filename, &file_path);
     let statements = p.parse_statements()?;
-    Ok(EnvxFile { path: file_path, source: source.to_string(), statements })
+    Ok(EnvxFile {
+        path: file_path,
+        source: source.to_string(),
+        statements,
+    })
 }
 
 // ─── File-level parser (Phase B outer) ───────────────────────────────────────
@@ -45,7 +48,13 @@ impl<'s> FileParser<'s> {
         filename: &'s str,
         file_path: &'s Path,
     ) -> Self {
-        Self { tokens, pos: 0, source, filename, file_path }
+        Self {
+            tokens,
+            pos: 0,
+            source,
+            filename,
+            file_path,
+        }
     }
 
     /// Drive the outer parse loop: one statement per logical line.
@@ -148,9 +157,9 @@ impl<'s> FileParser<'s> {
                 let mut val_end = val_span.end;
                 loop {
                     match self.tokens.get(self.pos) {
-                        Some((FileToken::Newline, _))
-                        | Some((FileToken::Comment, _))
-                        | None => break,
+                        Some((FileToken::Newline, _)) | Some((FileToken::Comment, _)) | None => {
+                            break;
+                        }
                         Some((_, span)) => {
                             val_end = span.end;
                             self.pos += 1;
@@ -310,11 +319,7 @@ impl<'s> FileParser<'s> {
 ///
 /// Called once per `${{ }}` block, after `lex_expr` has already tokenized the
 /// block's content. All tokens must be consumed; leftover tokens are an error.
-fn parse_expr_tokens(
-    tokens: &[Spanned<ExprToken>],
-    source: &str,
-    filename: &str,
-) -> Result<Expr> {
+fn parse_expr_tokens(tokens: &[Spanned<ExprToken>], source: &str, filename: &str) -> Result<Expr> {
     let mut p = ExprParser::new(tokens, source, filename);
     let expr = p.parse_pipe_chain()?;
 
@@ -341,7 +346,12 @@ struct ExprParser<'s> {
 
 impl<'s> ExprParser<'s> {
     fn new(tokens: &'s [Spanned<ExprToken>], source: &'s str, filename: &'s str) -> Self {
-        Self { tokens, pos: 0, source, filename }
+        Self {
+            tokens,
+            pos: 0,
+            source,
+            filename,
+        }
     }
 
     /// Peek at the current token without consuming it (returns a clone).
@@ -359,7 +369,10 @@ impl<'s> ExprParser<'s> {
 
     /// Span of one past the last token — used for "unexpected EOF" diagnostics.
     fn eof_span(&self) -> Span {
-        self.tokens.last().map(|(_, s)| Span::new(s.end, s.end)).unwrap_or_default()
+        self.tokens
+            .last()
+            .map(|(_, s)| Span::new(s.end, s.end))
+            .unwrap_or_default()
     }
 
     fn named(&self) -> NamedSource<String> {
@@ -401,8 +414,16 @@ impl<'s> ExprParser<'s> {
                     };
 
                     let pipe_span = expr.span().merge(fn_span);
-                    let func = FnCall { name, args, span: fn_span };
-                    expr = Expr::Pipe { expr: Box::new(expr), func, span: pipe_span };
+                    let func = FnCall {
+                        name,
+                        args,
+                        span: fn_span,
+                    };
+                    expr = Expr::Pipe {
+                        expr: Box::new(expr),
+                        func,
+                        span: pipe_span,
+                    };
                 }
                 Some((other, span)) => {
                     return Err(EnvxError::UnexpectedToken {
@@ -429,34 +450,20 @@ impl<'s> ExprParser<'s> {
     fn parse_primary(&mut self) -> Result<Expr> {
         match self.advance() {
             // ── Variable reference: `$NAME` ───────────────────────────────────
-            Some((ExprToken::VarRef(name), span)) => {
-                Ok(Expr::VarRef { name, span })
-            }
+            Some((ExprToken::VarRef(name), span)) => Ok(Expr::VarRef { name, span }),
 
             // ── Literals ─────────────────────────────────────────────────────
-            Some((ExprToken::StrLit(s), span)) => {
-                Ok(Expr::Literal(Value::Str(s), span))
-            }
-            Some((ExprToken::IntLit(n), span)) => {
-                Ok(Expr::Literal(Value::Int(n), span))
-            }
-            Some((ExprToken::True, span)) => {
-                Ok(Expr::Literal(Value::Bool(true), span))
-            }
-            Some((ExprToken::False, span)) => {
-                Ok(Expr::Literal(Value::Bool(false), span))
-            }
+            Some((ExprToken::StrLit(s), span)) => Ok(Expr::Literal(Value::Str(s), span)),
+            Some((ExprToken::IntLit(n), span)) => Ok(Expr::Literal(Value::Int(n), span)),
+            Some((ExprToken::True, span)) => Ok(Expr::Literal(Value::Bool(true), span)),
+            Some((ExprToken::False, span)) => Ok(Expr::Literal(Value::Bool(false), span)),
 
             // ── Direct function call: `name(args…)` ───────────────────────────
             // Includes the special `ENV('KEY')` → `Expr::EnvLookup` rewrite.
-            Some((ExprToken::Ident(name), fn_span)) => {
-                self.parse_fn_call(name, fn_span)
-            }
+            Some((ExprToken::Ident(name), fn_span)) => self.parse_fn_call(name, fn_span),
 
             // ── Conditional: `if cond then val else val` ──────────────────────
-            Some((ExprToken::If, if_span)) => {
-                self.parse_if_expr(if_span)
-            }
+            Some((ExprToken::If, if_span)) => self.parse_if_expr(if_span),
 
             Some((other, span)) => Err(EnvxError::UnexpectedToken {
                 expected: "expression ($VAR, literal, function call, or `if …`)".into(),
@@ -485,9 +492,10 @@ impl<'s> ExprParser<'s> {
 
         if name == "ENV" {
             return match args.as_slice() {
-                [Expr::Literal(Value::Str(key), _)] => {
-                    Ok(Expr::EnvLookup { key: key.clone(), span: call_span })
-                }
+                [Expr::Literal(Value::Str(key), _)] => Ok(Expr::EnvLookup {
+                    key: key.clone(),
+                    span: call_span,
+                }),
                 _ => Err(EnvxError::ArityError {
                     func: "ENV".into(),
                     expected: "exactly 1 string literal".into(),
@@ -496,7 +504,11 @@ impl<'s> ExprParser<'s> {
             };
         }
 
-        Ok(Expr::Call(FnCall { name, args, span: call_span }))
+        Ok(Expr::Call(FnCall {
+            name,
+            args,
+            span: call_span,
+        }))
     }
 
     /// Parse `if <cond> then <then_val> else <else_val>`.
@@ -507,7 +519,12 @@ impl<'s> ExprParser<'s> {
         self.consume(ExprToken::Else, "else")?;
         let else_val = Box::new(self.parse_pipe_chain()?);
         let span = if_span.merge(else_val.span());
-        Ok(Expr::IfExpr { cond, then_val, else_val, span })
+        Ok(Expr::IfExpr {
+            cond,
+            then_val,
+            else_val,
+            span,
+        })
     }
 
     /// Parse a comma-separated argument list.
@@ -564,7 +581,8 @@ mod tests {
 
     fn first_entry(src: &str) -> (String, Template) {
         let file = parse_ok(src);
-        if let Statement::Entry { key, template, .. } = file.statements.into_iter().next().unwrap() {
+        if let Statement::Entry { key, template, .. } = file.statements.into_iter().next().unwrap()
+        {
             (key, template)
         } else {
             panic!("expected Entry statement");
@@ -608,7 +626,9 @@ mod tests {
         // "${{ $USER }}@company.com" → [Expr(VarRef), Literal("@company.com")]
         let (_, tmpl) = first_entry("EMAIL = \"${{ $USER }}@company.com\"\n");
         assert_eq!(tmpl.segments.len(), 2);
-        assert!(matches!(&tmpl.segments[0], Segment::Expr(Expr::VarRef { name, .. }) if name == "USER"));
+        assert!(
+            matches!(&tmpl.segments[0], Segment::Expr(Expr::VarRef { name, .. }) if name == "USER")
+        );
         assert!(matches!(&tmpl.segments[1], Segment::Literal(s) if s == "@company.com"));
     }
 
@@ -618,7 +638,10 @@ mod tests {
         let (_, tmpl) = first_entry("Y = \"prefix${{ $X }}\"\n");
         assert_eq!(tmpl.segments.len(), 2);
         assert!(matches!(&tmpl.segments[0], Segment::Literal(s) if s == "prefix"));
-        assert!(matches!(&tmpl.segments[1], Segment::Expr(Expr::VarRef { .. })));
+        assert!(matches!(
+            &tmpl.segments[1],
+            Segment::Expr(Expr::VarRef { .. })
+        ));
     }
 
     #[test]
@@ -656,8 +679,7 @@ mod tests {
     #[test]
     fn pipe_with_args() {
         // $NAME | replace(' ', '_')
-        let (_, tmpl) =
-            first_entry("USERNAME = \"${{ $NAME | replace(' ', '_') }}\"\n");
+        let (_, tmpl) = first_entry("USERNAME = \"${{ $NAME | replace(' ', '_') }}\"\n");
         if let Segment::Expr(Expr::Pipe { func, .. }) = &tmpl.segments[0] {
             assert_eq!(func.name, "replace");
             assert_eq!(func.args.len(), 2);
@@ -709,10 +731,15 @@ mod tests {
 
     #[test]
     fn if_then_else_basic() {
-        let src =
-            "DB = \"${{ if eq($APP_ENV, 'prod') then 'api.db.com' else 'localhost' }}\"\n";
+        let src = "DB = \"${{ if eq($APP_ENV, 'prod') then 'api.db.com' else 'localhost' }}\"\n";
         let (_, tmpl) = first_entry(src);
-        if let Segment::Expr(Expr::IfExpr { cond, then_val, else_val, .. }) = &tmpl.segments[0] {
+        if let Segment::Expr(Expr::IfExpr {
+            cond,
+            then_val,
+            else_val,
+            ..
+        }) = &tmpl.segments[0]
+        {
             assert!(matches!(cond.as_ref(), Expr::Call(f) if f.name == "eq"));
             assert!(
                 matches!(then_val.as_ref(), Expr::Literal(Value::Str(s), _) if s == "api.db.com")
@@ -742,17 +769,19 @@ mod tests {
     #[test]
     fn bool_literal() {
         let (_, tmpl) = first_entry("X = \"${{ true }}\"\n");
-        assert!(
-            matches!(&tmpl.segments[0], Segment::Expr(Expr::Literal(Value::Bool(true), _)))
-        );
+        assert!(matches!(
+            &tmpl.segments[0],
+            Segment::Expr(Expr::Literal(Value::Bool(true), _))
+        ));
     }
 
     #[test]
     fn int_literal() {
         let (_, tmpl) = first_entry("X = \"${{ 42 }}\"\n");
-        assert!(
-            matches!(&tmpl.segments[0], Segment::Expr(Expr::Literal(Value::Int(42), _)))
-        );
+        assert!(matches!(
+            &tmpl.segments[0],
+            Segment::Expr(Expr::Literal(Value::Int(42), _))
+        ));
     }
 
     // ── Import directive ──────────────────────────────────────────────────────
@@ -762,7 +791,10 @@ mod tests {
         let src = "@import \"./base.envx\"\n";
         let file = parse_ok(src);
         assert_eq!(file.statements.len(), 1);
-        if let Statement::Import { raw_path, resolved, .. } = &file.statements[0] {
+        if let Statement::Import {
+            raw_path, resolved, ..
+        } = &file.statements[0]
+        {
             assert_eq!(raw_path, "./base.envx");
             assert!(resolved.ends_with("base.envx"));
         } else {
@@ -851,6 +883,10 @@ DB_HOST = "${{ if eq($APP_ENV, 'prod') then 'api.db.com' else 'localhost' }}"
         let file = parse_ok(src);
         assert_eq!(file.statements.len(), 6);
         // All are Entry statements
-        assert!(file.statements.iter().all(|s| matches!(s, Statement::Entry { .. })));
+        assert!(
+            file.statements
+                .iter()
+                .all(|s| matches!(s, Statement::Entry { .. }))
+        );
     }
 }

@@ -115,10 +115,13 @@ envx/
 |-------|---------|---------|
 | `clap` | 4 | CLI subcommands with derive macros |
 | `logos` | 0.14 | Lexer via DFA-based macros (O(n)) |
-| `petgraph` | 0.6 | DAG, `toposort()`, `is_cyclic_directed()` |
+| `petgraph` | 0.8 | DAG, `toposort()`, `is_cyclic_directed()` |
 | `miette` | 7 | Human-friendly error reports with source spans |
 | `thiserror` | 2 | `derive(Error)` for `EnvxError` |
 | `indexmap` | 2 | `IndexMap` — `HashMap` that preserves insertion order |
+| `chrono` | 0.4 | Date/time formatting for `now()` and date functions |
+| `rand` | 0.9 | CSPRNG (ChaCha12) for `secret()` |
+| `uuid` | 1 | UUID v4/v7 generation for `uuid()` |
 
 ---
 
@@ -171,9 +174,18 @@ pub struct EnvxFile {
     pub statements: Vec<Statement>,
 }
 
+pub enum LayoutItem {
+    Section(String),   // [section_name] header
+    Entry(String),     // variable key
+}
+
 pub struct ResolvedEnv {
     // IndexMap preserves declaration order (important for export output)
     pub entries: IndexMap<String, (Template, PathBuf)>,
+    pub sources: HashMap<PathBuf, String>,
+    // Ordered display layout: sections interleaved with entry keys.
+    // Used by `envx print` to render group headers and tag filtering.
+    pub layout: Vec<LayoutItem>,
 }
 ```
 
@@ -208,9 +220,11 @@ pub type Spanned<T> = (T, Span);
 // Outer file structure
 pub enum FileToken {
     Import,
+    Section(String),        // [name] — section header (name between brackets)
     Ident,
     Eq,
     StringContent(String),  // raw content between "..." (quotes stripped)
+    BareChunk,              // unquoted value token
     Comment,
     Newline,
 }
@@ -401,25 +415,33 @@ Any other function name → `EnvxError::UnknownFunction`.
 ## CLI Commands (`src/main.rs`)
 
 ```
-envx run   <file.envx> [--] <cmd> [args...]
-    Evaluate file, inject all variables into the child process's environment,
-    exec the command. Uses std::process::Command::envs().
+envx run   <file.envx> [-t TAG]... [--] <cmd> [args...]
+    Evaluate file, inject variables into the child process's environment.
+    -t / --tag TAG  Only inject variables belonging to the given section(s).
+                    All variables are still evaluated (for dependency resolution).
+                    Repeatable: -t database -t app
 
 envx export <file.envx>
     Print all resolved variables as shell export statements:
     export KEY="value"
     Suitable for: eval $(envx export app.envx)
+               or: source <(envx export app.envx)
 
 envx eval  '<expression>'
     Evaluate a single expression for debugging. Reads OS environment for $VARs.
     Example: envx eval '$HOME | lower'
 
-envx print <file.envx> [--tags]
-    Parse and print the resolved variables without executing a command.
-    With --tags, groups variables by their [SectionName] tag.
+envx print <file.envx> [-T] [-t TAG]...
+    Print all resolved variables in an aligned KEY | VALUE table.
+    -T / --tags     Add a TAG column, sort rows by tag name ascending.
+    -t / --tag TAG  Filter to variables from the given section(s). Repeatable.
 
 envx fmt   <file.envx> [--check]
-    Format the file, aligning '=' signs and normalizing whitespace in template blocks.
+    Format the file in-place:
+      - Aligns '=' across all assignments to the longest key width.
+      - Normalises whitespace inside ${{ }} expression blocks.
+      - Normalises section headers (strips surrounding whitespace, trims brackets).
+    --check  Exit non-zero if the file is not already formatted (CI use).
 
 envx completions <shell>
     Generate shell completion scripts (bash, zsh, fish, powershell).

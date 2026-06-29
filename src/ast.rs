@@ -62,17 +62,11 @@ pub enum Expr {
     Literal(Value, Span),
 
     /// Reference to a variable defined earlier: `$NAME`.
-    VarRef {
-        name: String,
-        span: Span,
-    },
+    VarRef { name: String, span: Span },
 
     /// Look up an OS environment variable: `ENV("PORT")`.
     /// Distinct from VarRef so the evaluator can access `std::env::var` cleanly.
-    EnvLookup {
-        key: String,
-        span: Span,
-    },
+    EnvLookup { key: String, span: Span },
 
     /// A pipeline step: `<expr> | <function>(<args...>)`.
     ///
@@ -132,7 +126,12 @@ impl Expr {
                     arg.collect_var_refs(out);
                 }
             }
-            Expr::IfExpr { cond, then_val, else_val, .. } => {
+            Expr::IfExpr {
+                cond,
+                then_val,
+                else_val,
+                ..
+            } => {
                 cond.collect_var_refs(out);
                 then_val.collect_var_refs(out);
                 else_val.collect_var_refs(out);
@@ -157,13 +156,16 @@ impl Expr {
                     None
                 }
             }
-            Expr::Pipe { expr, func, .. } => {
-                expr.find_var_ref_at(offset).or_else(|| {
-                    func.args.iter().find_map(|arg| arg.find_var_ref_at(offset))
-                })
-            }
+            Expr::Pipe { expr, func, .. } => expr
+                .find_var_ref_at(offset)
+                .or_else(|| func.args.iter().find_map(|arg| arg.find_var_ref_at(offset))),
             Expr::Call(f) => f.args.iter().find_map(|arg| arg.find_var_ref_at(offset)),
-            Expr::IfExpr { cond, then_val, else_val, .. } => cond
+            Expr::IfExpr {
+                cond,
+                then_val,
+                else_val,
+                ..
+            } => cond
                 .find_var_ref_at(offset)
                 .or_else(|| then_val.find_var_ref_at(offset))
                 .or_else(|| else_val.find_var_ref_at(offset)),
@@ -243,10 +245,7 @@ pub enum Statement {
     },
 
     /// `[section_name]` — a grouping label. Has no effect on evaluation.
-    Section {
-        name: String,
-        span: Span,
-    },
+    Section { name: String, span: Span },
 
     /// `KEY = "value"` or `KEY = "${{ expr }}"`
     Entry {

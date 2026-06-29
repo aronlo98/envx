@@ -35,6 +35,8 @@ Register-ArgumentCompleter -Native -CommandName 'envx' -ScriptBlock {
             break
         }
         'envx;run' {
+            [CompletionResult]::new('-t', '-t', [CompletionResultType]::ParameterName, 'Only inject variables belonging to these section tags (repeatable: -t db -t app)')
+            [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Only inject variables belonging to these section tags (repeatable: -t db -t app)')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             break
@@ -50,7 +52,9 @@ Register-ArgumentCompleter -Native -CommandName 'envx' -ScriptBlock {
             break
         }
         'envx;print' {
-            [CompletionResult]::new('-t', '-t', [CompletionResultType]::ParameterName, 'Show a TAG column and sort rows by tag name ascending')
+            [CompletionResult]::new('-t', '-t', [CompletionResultType]::ParameterName, 'Only show variables belonging to these section tags (repeatable: -t db -t app)')
+            [CompletionResult]::new('--tag', '--tag', [CompletionResultType]::ParameterName, 'Only show variables belonging to these section tags (repeatable: -t db -t app)')
+            [CompletionResult]::new('-T', '-T ', [CompletionResultType]::ParameterName, 'Show a TAG column and sort rows by tag name ascending')
             [CompletionResult]::new('--tags', '--tags', [CompletionResultType]::ParameterName, 'Show a TAG column and sort rows by tag name ascending')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help (see more with ''--help'')')

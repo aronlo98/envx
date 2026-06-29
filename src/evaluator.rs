@@ -46,9 +46,11 @@ impl<'e> EvalContext<'e> {
         if let Some(v) = self.memo.get(name) {
             return Ok(v.clone());
         }
-        let (template, source_path) = self.env.entries.get(name).expect(
-            "eval_var called for a name not in env — dag order is inconsistent",
-        );
+        let (template, source_path) = self
+            .env
+            .entries
+            .get(name)
+            .expect("eval_var called for a name not in env — dag order is inconsistent");
         let template = template.clone();
         let source_path = source_path.clone();
         let value = self.eval_template(&template, &source_path)?;
@@ -56,7 +58,11 @@ impl<'e> EvalContext<'e> {
         Ok(value)
     }
 
-    fn eval_template(&mut self, template: &Template, source_path: &std::path::Path) -> Result<Value> {
+    fn eval_template(
+        &mut self,
+        template: &Template,
+        source_path: &std::path::Path,
+    ) -> Result<Value> {
         // Templates always produce Str — Int/Bool exist only inside expression trees.
         let mut buf = String::new();
         for seg in &template.segments {
@@ -109,7 +115,12 @@ impl<'e> EvalContext<'e> {
                 Ok(Value::Str(val))
             }
 
-            Expr::IfExpr { cond, then_val, else_val, .. } => {
+            Expr::IfExpr {
+                cond,
+                then_val,
+                else_val,
+                ..
+            } => {
                 let cond_val = self.eval_expr(cond, source_path)?;
                 if cond_val.is_truthy() {
                     self.eval_expr(then_val, source_path)
@@ -126,7 +137,9 @@ impl<'e> EvalContext<'e> {
                 builtins::dispatch(&fn_call.name, None, arg_vals)
             }
 
-            Expr::Pipe { expr: lhs, func, .. } => {
+            Expr::Pipe {
+                expr: lhs, func, ..
+            } => {
                 let recv = self.eval_expr(lhs, source_path)?;
                 let mut arg_vals = Vec::with_capacity(func.args.len());
                 for arg in &func.args {
@@ -152,7 +165,13 @@ mod tests {
         let file = parser::parse(src, "test.envx", path.clone()).unwrap();
         let mut env = ResolvedEnv::default();
         for stmt in file.statements {
-            if let Statement::Entry { key, template, source, .. } = stmt {
+            if let Statement::Entry {
+                key,
+                template,
+                source,
+                ..
+            } = stmt
+            {
                 env.entries.insert(key, (template, source));
             }
         }
@@ -166,7 +185,9 @@ mod tests {
         eval_src(src).expect("unexpected evaluation error")
     }
 
-    fn s(v: &str) -> Value { Value::Str(v.to_string()) }
+    fn s(v: &str) -> Value {
+        Value::Str(v.to_string())
+    }
 
     // ── Basic literal values ──────────────────────────────────────────────────
 
@@ -259,13 +280,17 @@ mod tests {
 
     #[test]
     fn if_then_else_true_branch() {
-        let out = eval("APP_ENV = \"prod\"\nDB = \"${{ if eq($APP_ENV, 'prod') then 'api.db' else 'localhost' }}\"\n");
+        let out = eval(
+            "APP_ENV = \"prod\"\nDB = \"${{ if eq($APP_ENV, 'prod') then 'api.db' else 'localhost' }}\"\n",
+        );
         assert_eq!(out["DB"], s("api.db"));
     }
 
     #[test]
     fn if_then_else_false_branch() {
-        let out = eval("APP_ENV = \"dev\"\nDB = \"${{ if eq($APP_ENV, 'prod') then 'api.db' else 'localhost' }}\"\n");
+        let out = eval(
+            "APP_ENV = \"dev\"\nDB = \"${{ if eq($APP_ENV, 'prod') then 'api.db' else 'localhost' }}\"\n",
+        );
         assert_eq!(out["DB"], s("localhost"));
     }
 
@@ -273,15 +298,21 @@ mod tests {
 
     #[test]
     fn env_lookup_existing_var() {
-        unsafe { std::env::set_var("__ENVX_TEST_PORT", "9000"); }
+        unsafe {
+            std::env::set_var("__ENVX_TEST_PORT", "9000");
+        }
         let out = eval("PORT = \"${{ ENV('__ENVX_TEST_PORT') }}\"\n");
         assert_eq!(out["PORT"], s("9000"));
-        unsafe { std::env::remove_var("__ENVX_TEST_PORT"); }
+        unsafe {
+            std::env::remove_var("__ENVX_TEST_PORT");
+        }
     }
 
     #[test]
     fn env_lookup_missing_var_returns_empty() {
-        unsafe { std::env::remove_var("__ENVX_NONEXISTENT_XYZ"); }
+        unsafe {
+            std::env::remove_var("__ENVX_NONEXISTENT_XYZ");
+        }
         let out = eval("PORT = \"${{ ENV('__ENVX_NONEXISTENT_XYZ') }}\"\n");
         assert_eq!(out["PORT"], s(""));
     }
@@ -290,7 +321,9 @@ mod tests {
 
     #[test]
     fn default_with_env_fallback() {
-        unsafe { std::env::remove_var("__ENVX_MISSING"); }
+        unsafe {
+            std::env::remove_var("__ENVX_MISSING");
+        }
         let out = eval("PORT = \"${{ ENV('__ENVX_MISSING') | default('3000') }}\"\n");
         assert_eq!(out["PORT"], s("3000"));
     }

@@ -6,6 +6,19 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-29
+
+### Added
+
+- `envx print --tag TAG` / `-t TAG` — filter printed variables to those belonging to the given section tag. Repeatable for multiple tags: `-t database -t app`. Works with or without `-T`.
+- `envx run --tag TAG` / `-t TAG` — only inject variables from the specified section(s) into the child process environment. All variables are still evaluated (to resolve cross-section dependencies), but only those in the requested tag(s) are passed to the process.
+
+### Changed
+
+- `envx print --tags` short flag renamed from `-t` to `-T`, freeing `-t` for the new `--tag` filter flag.
+
+---
+
 ## [0.1.3] - 2026-06-29
 
 ### Added

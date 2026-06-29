@@ -77,7 +77,7 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
                             func: name.to_string(),
                             expected: format!("Str for argument {}", i + 1),
                             got: other.type_name().to_string(),
-                        })
+                        });
                     }
                 }
             }
@@ -146,14 +146,14 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
                     return Err(EnvxError::InvalidArgument {
                         func: name.to_string(),
                         message: "length must be ≥ 0".to_string(),
-                    })
+                    });
                 }
                 other => {
                     return Err(EnvxError::TypeError {
                         func: name.to_string(),
                         expected: "Int".to_string(),
                         got: other.type_name().to_string(),
-                    })
+                    });
                 }
             };
             Ok(Value::Str(s.chars().take(n).collect()))
@@ -188,14 +188,14 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
                         func: name.to_string(),
                         expected: "Str".to_string(),
                         got: other.type_name().to_string(),
-                    })
+                    });
                 }
                 None => {
                     return Err(EnvxError::ArityError {
                         func: name.to_string(),
                         expected: "pipe receiver".to_string(),
                         got: 0,
-                    })
+                    });
                 }
             };
             let decimals: usize = match args.as_slice() {
@@ -205,14 +205,14 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
                     return Err(EnvxError::InvalidArgument {
                         func: name.to_string(),
                         message: "decimal places must be ≥ 0".to_string(),
-                    })
+                    });
                 }
                 _ => {
                     return Err(EnvxError::ArityError {
                         func: name.to_string(),
                         expected: "0 or 1".to_string(),
                         got: args.len(),
-                    })
+                    });
                 }
             };
             let f: f64 = s.trim().parse().map_err(|_| EnvxError::InvalidArgument {
@@ -245,11 +245,13 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
             }
             let name = match args.as_slice() {
                 [Value::Str(s)] => s.clone(),
-                _ => return Err(EnvxError::ArityError {
-                    func: "emoji".into(),
-                    expected: "1".into(),
-                    got: args.len(),
-                }),
+                _ => {
+                    return Err(EnvxError::ArityError {
+                        func: "emoji".into(),
+                        expected: "1".into(),
+                        got: args.len(),
+                    });
+                }
             };
             let ch = emoji_lookup(&name).ok_or_else(|| EnvxError::InvalidArgument {
                 func: "emoji".into(),
@@ -277,7 +279,6 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
         // Usage pattern:
         //   now() | date_add(30, 'days') | date_format('YYYYMMDD')
         //   now() | year()    now() | month()    now() | weekday()
-
         "timestamp" => {
             if recv.is_some() || !args.is_empty() {
                 return Err(EnvxError::ArityError {
@@ -294,19 +295,23 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
             let date_str = require_recv_str(name, recv, &args, 2)?;
             let n = match &args[0] {
                 Value::Int(n) => *n,
-                other => return Err(EnvxError::TypeError {
-                    func: name.to_string(),
-                    expected: "Int for argument 1 (amount)".to_string(),
-                    got: other.type_name().to_string(),
-                }),
+                other => {
+                    return Err(EnvxError::TypeError {
+                        func: name.to_string(),
+                        expected: "Int for argument 1 (amount)".to_string(),
+                        got: other.type_name().to_string(),
+                    });
+                }
             };
             let unit = match &args[1] {
                 Value::Str(s) => s.clone(),
-                other => return Err(EnvxError::TypeError {
-                    func: name.to_string(),
-                    expected: "Str for argument 2 (unit)".to_string(),
-                    got: other.type_name().to_string(),
-                }),
+                other => {
+                    return Err(EnvxError::TypeError {
+                        func: name.to_string(),
+                        expected: "Str for argument 2 (unit)".to_string(),
+                        got: other.type_name().to_string(),
+                    });
+                }
             };
             let dt = parse_date_str(&date_str, name)?;
             let result = apply_date_offset(dt, n, &unit, name)?;
@@ -318,19 +323,23 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
             let date1_str = require_recv_str(name, recv, &args, 2)?;
             let date2_str = match &args[0] {
                 Value::Str(s) => s.clone(),
-                other => return Err(EnvxError::TypeError {
-                    func: name.to_string(),
-                    expected: "Str for argument 1 (date2)".to_string(),
-                    got: other.type_name().to_string(),
-                }),
+                other => {
+                    return Err(EnvxError::TypeError {
+                        func: name.to_string(),
+                        expected: "Str for argument 1 (date2)".to_string(),
+                        got: other.type_name().to_string(),
+                    });
+                }
             };
             let unit = match &args[1] {
                 Value::Str(s) => s.clone(),
-                other => return Err(EnvxError::TypeError {
-                    func: name.to_string(),
-                    expected: "Str for argument 2 (unit)".to_string(),
-                    got: other.type_name().to_string(),
-                }),
+                other => {
+                    return Err(EnvxError::TypeError {
+                        func: name.to_string(),
+                        expected: "Str for argument 2 (unit)".to_string(),
+                        got: other.type_name().to_string(),
+                    });
+                }
             };
             let dt1 = parse_date_str(&date1_str, name)?;
             let dt2 = parse_date_str(&date2_str, name)?;
@@ -342,11 +351,13 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
             let date_str = require_recv_str(name, recv, &args, 1)?;
             let fmt = match &args[0] {
                 Value::Str(s) => to_strftime(s),
-                other => return Err(EnvxError::TypeError {
-                    func: name.to_string(),
-                    expected: "Str for argument 1 (format)".to_string(),
-                    got: other.type_name().to_string(),
-                }),
+                other => {
+                    return Err(EnvxError::TypeError {
+                        func: name.to_string(),
+                        expected: "Str for argument 1 (format)".to_string(),
+                        got: other.type_name().to_string(),
+                    });
+                }
             };
             let dt = parse_date_str(&date_str, name)?;
             Ok(Value::Str(dt.format(&fmt).to_string()))
@@ -391,14 +402,14 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
                     return Err(EnvxError::InvalidArgument {
                         func: "uuid".into(),
                         message: format!("unsupported UUID version {n}; supported: 4, 7"),
-                    })
+                    });
                 }
                 _ => {
                     return Err(EnvxError::ArityError {
                         func: "uuid".into(),
                         expected: "0 or 1".into(),
                         got: args.len(),
-                    })
+                    });
                 }
             };
             Ok(Value::Str(id.to_string()))
@@ -414,11 +425,13 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
             let fmt = match args.as_slice() {
                 [] => "%Y-%m-%dT%H:%M:%S".to_string(),
                 [Value::Str(user_fmt)] => to_strftime(user_fmt),
-                _ => return Err(EnvxError::ArityError {
-                    func: "now".to_string(),
-                    expected: "0 or 1".to_string(),
-                    got: args.len(),
-                }),
+                _ => {
+                    return Err(EnvxError::ArityError {
+                        func: "now".to_string(),
+                        expected: "0 or 1".to_string(),
+                        got: args.len(),
+                    });
+                }
             };
             Ok(Value::Str(Local::now().format(&fmt).to_string()))
         }
@@ -468,13 +481,15 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
                         func: "secret".into(),
                         expected: "0, 1, or 2".into(),
                         got: args.len(),
-                    })
+                    });
                 }
             };
 
             let chars: Vec<char> = alphabet.chars().collect();
             let mut rng = rand::rng();
-            let s: String = (0..length).map(|_| chars[rng.random_range(0..chars.len())]).collect();
+            let s: String = (0..length)
+                .map(|_| chars[rng.random_range(0..chars.len())])
+                .collect();
             Ok(Value::Str(s))
         }
 
@@ -509,18 +524,18 @@ pub fn dispatch(name: &str, recv: Option<Value>, args: Vec<Value>) -> Result<Val
 /// Any character not part of a token is passed through unchanged.
 fn to_strftime(fmt: &str) -> String {
     fmt.replace("YYYY", "%Y")
-        .replace("YY",   "%y")
+        .replace("YY", "%y")
         .replace("MMMM", "%B")
-        .replace("MMM",  "%b")
-        .replace("MM",   "%m")
+        .replace("MMM", "%b")
+        .replace("MM", "%m")
         .replace("DDDD", "%A")
-        .replace("DDD",  "%a")
-        .replace("DD",   "%d")
-        .replace("HH",   "%H")
-        .replace("hh",   "%I")
-        .replace("mm",   "%M")
-        .replace("ss",   "%S")
-        .replace('A',    "%p")
+        .replace("DDD", "%a")
+        .replace("DD", "%d")
+        .replace("HH", "%H")
+        .replace("hh", "%I")
+        .replace("mm", "%M")
+        .replace("ss", "%S")
+        .replace('A', "%p")
 }
 
 // ─── Alphabet presets ─────────────────────────────────────────────────────────
@@ -537,12 +552,12 @@ fn to_strftime(fmt: &str) -> String {
 /// | anything else | treated as a literal character set  |
 fn resolve_alphabet(s: &str) -> &str {
     match s {
-        "hex"       => "0123456789abcdef",
-        "base64"    => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
+        "hex" => "0123456789abcdef",
+        "base64" => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/",
         "base64url" => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_",
-        "alpha"     => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-        "numeric"   => "0123456789",
-        other       => other,
+        "alpha" => "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+        "numeric" => "0123456789",
+        other => other,
     }
 }
 
@@ -552,14 +567,11 @@ fn resolve_alphabet(s: &str) -> &str {
 fn parse_date_str(s: &str, func: &str) -> Result<NaiveDateTime> {
     NaiveDateTime::parse_from_str(s.trim(), "%Y-%m-%dT%H:%M:%S")
         .or_else(|_| {
-            NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d")
-                .map(|d| d.and_hms_opt(0, 0, 0).unwrap())
+            NaiveDate::parse_from_str(s.trim(), "%Y-%m-%d").map(|d| d.and_hms_opt(0, 0, 0).unwrap())
         })
         .map_err(|_| EnvxError::InvalidArgument {
             func: func.to_string(),
-            message: format!(
-                "cannot parse '{s}' as a date; use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"
-            ),
+            message: format!("cannot parse '{s}' as a date; use YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS"),
         })
 }
 
@@ -571,25 +583,31 @@ fn apply_date_offset(dt: NaiveDateTime, n: i64, unit: &str, func: &str) -> Resul
     let result = match unit.trim_end_matches('s') {
         "second" => dt.checked_add_signed(Duration::seconds(n)),
         "minute" => dt.checked_add_signed(Duration::minutes(n)),
-        "hour"   => dt.checked_add_signed(Duration::hours(n)),
-        "day"    => dt.checked_add_signed(Duration::days(n)),
-        "week"   => dt.checked_add_signed(Duration::weeks(n)),
-        "month"  => if n >= 0 {
-            dt.checked_add_months(Months::new(n as u32))
-        } else {
-            dt.checked_sub_months(Months::new((-n) as u32))
-        },
-        "year"   => if n >= 0 {
-            dt.checked_add_months(Months::new(n as u32 * 12))
-        } else {
-            dt.checked_sub_months(Months::new((-n) as u32 * 12))
-        },
-        _ => return Err(EnvxError::InvalidArgument {
-            func: func.to_string(),
-            message: format!(
-                "unknown unit '{unit}'; use: seconds, minutes, hours, days, weeks, months, years"
-            ),
-        }),
+        "hour" => dt.checked_add_signed(Duration::hours(n)),
+        "day" => dt.checked_add_signed(Duration::days(n)),
+        "week" => dt.checked_add_signed(Duration::weeks(n)),
+        "month" => {
+            if n >= 0 {
+                dt.checked_add_months(Months::new(n as u32))
+            } else {
+                dt.checked_sub_months(Months::new((-n) as u32))
+            }
+        }
+        "year" => {
+            if n >= 0 {
+                dt.checked_add_months(Months::new(n as u32 * 12))
+            } else {
+                dt.checked_sub_months(Months::new((-n) as u32 * 12))
+            }
+        }
+        _ => {
+            return Err(EnvxError::InvalidArgument {
+                func: func.to_string(),
+                message: format!(
+                    "unknown unit '{unit}'; use: seconds, minutes, hours, days, weeks, months, years"
+                ),
+            });
+        }
     };
     result.ok_or_else(|| EnvxError::InvalidArgument {
         func: func.to_string(),
@@ -603,14 +621,13 @@ fn calc_date_diff(dt1: NaiveDateTime, dt2: NaiveDateTime, unit: &str, func: &str
     match unit.trim_end_matches('s') {
         "second" => Ok(dur.num_seconds()),
         "minute" => Ok(dur.num_minutes()),
-        "hour"   => Ok(dur.num_hours()),
-        "day"    => Ok(dur.num_days()),
-        "week"   => Ok(dur.num_weeks()),
-        "month"  => Ok(
-            (dt2.year() - dt1.year()) as i64 * 12
-                + dt2.month() as i64 - dt1.month() as i64,
-        ),
-        "year"   => Ok((dt2.year() - dt1.year()) as i64),
+        "hour" => Ok(dur.num_hours()),
+        "day" => Ok(dur.num_days()),
+        "week" => Ok(dur.num_weeks()),
+        "month" => {
+            Ok((dt2.year() - dt1.year()) as i64 * 12 + dt2.month() as i64 - dt1.month() as i64)
+        }
+        "year" => Ok((dt2.year() - dt1.year()) as i64),
         _ => Err(EnvxError::InvalidArgument {
             func: func.to_string(),
             message: format!(
@@ -625,32 +642,64 @@ fn calc_date_diff(dt1: NaiveDateTime, dt2: NaiveDateTime, unit: &str, func: &str
 fn emoji_lookup(name: &str) -> Option<&'static str> {
     match name {
         // Animals
-        "panda"   => Some("🐼"), "cat"     => Some("🐱"), "dog"   => Some("🐶"),
-        "fox"     => Some("🦊"), "bear"    => Some("🐻"), "rabbit"=> Some("🐰"),
-        "penguin" => Some("🐧"), "lion"    => Some("🦁"), "wolf"  => Some("🐺"),
-        "bird"    => Some("🐦"),
+        "panda" => Some("🐼"),
+        "cat" => Some("🐱"),
+        "dog" => Some("🐶"),
+        "fox" => Some("🦊"),
+        "bear" => Some("🐻"),
+        "rabbit" => Some("🐰"),
+        "penguin" => Some("🐧"),
+        "lion" => Some("🦁"),
+        "wolf" => Some("🐺"),
+        "bird" => Some("🐦"),
         // Faces
-        "smile"      => Some("😊"), "laugh"     => Some("😂"), "wink"  => Some("😉"),
-        "cool"       => Some("😎"), "heart_eyes"=> Some("😍"), "thinking"=> Some("🤔"),
-        "party"      => Some("🥳"), "sad"       => Some("😢"),
+        "smile" => Some("😊"),
+        "laugh" => Some("😂"),
+        "wink" => Some("😉"),
+        "cool" => Some("😎"),
+        "heart_eyes" => Some("😍"),
+        "thinking" => Some("🤔"),
+        "party" => Some("🥳"),
+        "sad" => Some("😢"),
         // Dev / Tech
-        "rocket"  => Some("🚀"), "computer" => Some("💻"), "phone"  => Some("📱"),
-        "key"     => Some("🔑"), "lock"     => Some("🔒"), "gear"   => Some("⚙️"),
-        "bug"     => Some("🐛"), "wrench"   => Some("🔧"), "package"=> Some("📦"),
-        "chart"   => Some("📊"),
+        "rocket" => Some("🚀"),
+        "computer" => Some("💻"),
+        "phone" => Some("📱"),
+        "key" => Some("🔑"),
+        "lock" => Some("🔒"),
+        "gear" => Some("⚙️"),
+        "bug" => Some("🐛"),
+        "wrench" => Some("🔧"),
+        "package" => Some("📦"),
+        "chart" => Some("📊"),
         // Nature
-        "sun"    => Some("☀️"), "moon"   => Some("🌙"), "fire"   => Some("🔥"),
-        "snow"   => Some("❄️"), "star"   => Some("⭐"), "zap"    => Some("⚡"),
-        "globe"  => Some("🌍"), "tree"   => Some("🌳"), "flower" => Some("🌸"),
-        "rainbow"=> Some("🌈"),
+        "sun" => Some("☀️"),
+        "moon" => Some("🌙"),
+        "fire" => Some("🔥"),
+        "snow" => Some("❄️"),
+        "star" => Some("⭐"),
+        "zap" => Some("⚡"),
+        "globe" => Some("🌍"),
+        "tree" => Some("🌳"),
+        "flower" => Some("🌸"),
+        "rainbow" => Some("🌈"),
         // Food
-        "pizza" => Some("🍕"), "coffee"=> Some("☕"), "beer"  => Some("🍺"),
-        "cake"  => Some("🎂"), "apple" => Some("🍎"),
+        "pizza" => Some("🍕"),
+        "coffee" => Some("☕"),
+        "beer" => Some("🍺"),
+        "cake" => Some("🎂"),
+        "apple" => Some("🍎"),
         // Symbols
-        "check"      => Some("✅"), "cross"     => Some("❌"), "warning"   => Some("⚠️"),
-        "heart"      => Some("❤️"), "thumbsup"  => Some("👍"), "thumbsdown"=> Some("👎"),
-        "clap"       => Some("👏"), "wave"      => Some("👋"), "trophy"    => Some("🏆"),
-        "flag"       => Some("🚩"),
+        "check" => Some("✅"),
+        "cross" => Some("❌"),
+        "warning" => Some("⚠️"),
+        "heart" => Some("❤️"),
+        "thumbsup" => Some("👍"),
+        "thumbsdown" => Some("👎"),
+        "clap" => Some("👏"),
+        "wave" => Some("👋"),
+        "trophy" => Some("🏆"),
+        "flag" => Some("🚩"),
         _ => None,
     }
 }
@@ -672,7 +721,7 @@ fn require_recv_str(
                 func: func.to_string(),
                 expected: format!("pipe receiver + {expected_args} arg(s)"),
                 got: 0,
-            })
+            });
         }
     };
     if args.len() != expected_args {
@@ -710,22 +759,36 @@ fn arg_str(func: &str, args: &[Value], idx: usize) -> Result<String> {
 mod tests {
     use super::*;
 
-    fn s(v: &str) -> Value { Value::Str(v.to_string()) }
+    fn s(v: &str) -> Value {
+        Value::Str(v.to_string())
+    }
 
     #[test]
     fn trim_whitespace() {
-        assert_eq!(dispatch("trim", Some(s("  hi  ")), vec![]).unwrap(), s("hi"));
+        assert_eq!(
+            dispatch("trim", Some(s("  hi  ")), vec![]).unwrap(),
+            s("hi")
+        );
     }
 
     #[test]
     fn lower_and_upper() {
-        assert_eq!(dispatch("lower", Some(s("Hello")), vec![]).unwrap(), s("hello"));
-        assert_eq!(dispatch("upper", Some(s("Hello")), vec![]).unwrap(), s("HELLO"));
+        assert_eq!(
+            dispatch("lower", Some(s("Hello")), vec![]).unwrap(),
+            s("hello")
+        );
+        assert_eq!(
+            dispatch("upper", Some(s("Hello")), vec![]).unwrap(),
+            s("HELLO")
+        );
     }
 
     #[test]
     fn len_returns_int() {
-        assert_eq!(dispatch("len", Some(s("abc")), vec![]).unwrap(), Value::Int(3));
+        assert_eq!(
+            dispatch("len", Some(s("abc")), vec![]).unwrap(),
+            Value::Int(3)
+        );
     }
 
     #[test]
@@ -790,12 +853,18 @@ mod tests {
 
     #[test]
     fn capitalize_lowercases_rest() {
-        assert_eq!(dispatch("capitalize", Some(s("hello world")), vec![]).unwrap(), s("Hello world"));
+        assert_eq!(
+            dispatch("capitalize", Some(s("hello world")), vec![]).unwrap(),
+            s("Hello world")
+        );
     }
 
     #[test]
     fn capitalize_already_upper() {
-        assert_eq!(dispatch("capitalize", Some(s("HELLO")), vec![]).unwrap(), s("Hello"));
+        assert_eq!(
+            dispatch("capitalize", Some(s("HELLO")), vec![]).unwrap(),
+            s("Hello")
+        );
     }
 
     #[test]
@@ -807,34 +876,52 @@ mod tests {
 
     #[test]
     fn title_multiple_words() {
-        assert_eq!(dispatch("title", Some(s("hello world")), vec![]).unwrap(), s("Hello World"));
+        assert_eq!(
+            dispatch("title", Some(s("hello world")), vec![]).unwrap(),
+            s("Hello World")
+        );
     }
 
     #[test]
     fn title_single_word() {
-        assert_eq!(dispatch("title", Some(s("hello")), vec![]).unwrap(), s("Hello"));
+        assert_eq!(
+            dispatch("title", Some(s("hello")), vec![]).unwrap(),
+            s("Hello")
+        );
     }
 
     #[test]
     fn title_preserves_existing_case_of_rest() {
-        assert_eq!(dispatch("title", Some(s("hELLO wORLD")), vec![]).unwrap(), s("HELLO WORLD"));
+        assert_eq!(
+            dispatch("title", Some(s("hELLO wORLD")), vec![]).unwrap(),
+            s("HELLO WORLD")
+        );
     }
 
     // ── truncate ──────────────────────────────────────────────────────────────
 
     #[test]
     fn truncate_cuts_to_length() {
-        assert_eq!(dispatch("truncate", Some(s("hello world")), vec![Value::Int(5)]).unwrap(), s("hello"));
+        assert_eq!(
+            dispatch("truncate", Some(s("hello world")), vec![Value::Int(5)]).unwrap(),
+            s("hello")
+        );
     }
 
     #[test]
     fn truncate_shorter_than_limit_unchanged() {
-        assert_eq!(dispatch("truncate", Some(s("hi")), vec![Value::Int(10)]).unwrap(), s("hi"));
+        assert_eq!(
+            dispatch("truncate", Some(s("hi")), vec![Value::Int(10)]).unwrap(),
+            s("hi")
+        );
     }
 
     #[test]
     fn truncate_zero_gives_empty() {
-        assert_eq!(dispatch("truncate", Some(s("hello")), vec![Value::Int(0)]).unwrap(), s(""));
+        assert_eq!(
+            dispatch("truncate", Some(s("hello")), vec![Value::Int(0)]).unwrap(),
+            s("")
+        );
     }
 
     #[test]
@@ -849,17 +936,26 @@ mod tests {
 
     #[test]
     fn abs_negative_int() {
-        assert_eq!(dispatch("abs", Some(Value::Int(-42)), vec![]).unwrap(), Value::Int(42));
+        assert_eq!(
+            dispatch("abs", Some(Value::Int(-42)), vec![]).unwrap(),
+            Value::Int(42)
+        );
     }
 
     #[test]
     fn abs_positive_int_unchanged() {
-        assert_eq!(dispatch("abs", Some(Value::Int(7)), vec![]).unwrap(), Value::Int(7));
+        assert_eq!(
+            dispatch("abs", Some(Value::Int(7)), vec![]).unwrap(),
+            Value::Int(7)
+        );
     }
 
     #[test]
     fn abs_zero() {
-        assert_eq!(dispatch("abs", Some(Value::Int(0)), vec![]).unwrap(), Value::Int(0));
+        assert_eq!(
+            dispatch("abs", Some(Value::Int(0)), vec![]).unwrap(),
+            Value::Int(0)
+        );
     }
 
     #[test]
@@ -884,7 +980,10 @@ mod tests {
 
     #[test]
     fn round_two_decimals() {
-        assert_eq!(dispatch("round", Some(s("3.14159")), vec![Value::Int(2)]).unwrap(), s("3.14"));
+        assert_eq!(
+            dispatch("round", Some(s("3.14159")), vec![Value::Int(2)]).unwrap(),
+            s("3.14")
+        );
     }
 
     #[test]
@@ -904,17 +1003,26 @@ mod tests {
 
     #[test]
     fn int_parses_integer_string() {
-        assert_eq!(dispatch("int", Some(s("42")), vec![]).unwrap(), Value::Int(42));
+        assert_eq!(
+            dispatch("int", Some(s("42")), vec![]).unwrap(),
+            Value::Int(42)
+        );
     }
 
     #[test]
     fn int_truncates_float() {
-        assert_eq!(dispatch("int", Some(s("3.9")), vec![]).unwrap(), Value::Int(3));
+        assert_eq!(
+            dispatch("int", Some(s("3.9")), vec![]).unwrap(),
+            Value::Int(3)
+        );
     }
 
     #[test]
     fn int_negative() {
-        assert_eq!(dispatch("int", Some(s("-7")), vec![]).unwrap(), Value::Int(-7));
+        assert_eq!(
+            dispatch("int", Some(s("-7")), vec![]).unwrap(),
+            Value::Int(-7)
+        );
     }
 
     #[test]
@@ -935,69 +1043,112 @@ mod tests {
 
     #[test]
     fn date_add_days() {
-        let v = dispatch("date_add", Some(s("2026-06-28T00:00:00")), vec![Value::Int(5), s("days")]).unwrap();
+        let v = dispatch(
+            "date_add",
+            Some(s("2026-06-28T00:00:00")),
+            vec![Value::Int(5), s("days")],
+        )
+        .unwrap();
         assert_eq!(v, s("2026-07-03T00:00:00"));
     }
 
     #[test]
     fn date_add_negative_subtracts() {
-        let v = dispatch("date_add", Some(s("2026-06-28T00:00:00")), vec![Value::Int(-7), s("days")]).unwrap();
+        let v = dispatch(
+            "date_add",
+            Some(s("2026-06-28T00:00:00")),
+            vec![Value::Int(-7), s("days")],
+        )
+        .unwrap();
         assert_eq!(v, s("2026-06-21T00:00:00"));
     }
 
     #[test]
     fn date_add_months() {
-        let v = dispatch("date_add", Some(s("2026-01-15T00:00:00")), vec![Value::Int(2), s("months")]).unwrap();
+        let v = dispatch(
+            "date_add",
+            Some(s("2026-01-15T00:00:00")),
+            vec![Value::Int(2), s("months")],
+        )
+        .unwrap();
         assert_eq!(v, s("2026-03-15T00:00:00"));
     }
 
     #[test]
     fn date_add_years() {
-        let v = dispatch("date_add", Some(s("2026-06-28T00:00:00")), vec![Value::Int(1), s("years")]).unwrap();
+        let v = dispatch(
+            "date_add",
+            Some(s("2026-06-28T00:00:00")),
+            vec![Value::Int(1), s("years")],
+        )
+        .unwrap();
         assert_eq!(v, s("2027-06-28T00:00:00"));
     }
 
     #[test]
     fn date_add_accepts_date_only_input() {
-        let v = dispatch("date_add", Some(s("2026-06-28")), vec![Value::Int(3), s("days")]).unwrap();
+        let v = dispatch(
+            "date_add",
+            Some(s("2026-06-28")),
+            vec![Value::Int(3), s("days")],
+        )
+        .unwrap();
         assert_eq!(v, s("2026-07-01T00:00:00"));
     }
 
     #[test]
     fn date_add_rejects_unknown_unit() {
         assert!(matches!(
-            dispatch("date_add", Some(s("2026-06-28")), vec![Value::Int(1), s("fortnight")]),
+            dispatch(
+                "date_add",
+                Some(s("2026-06-28")),
+                vec![Value::Int(1), s("fortnight")]
+            ),
             Err(EnvxError::InvalidArgument { .. })
         ));
     }
 
     #[test]
     fn date_diff_days_forward() {
-        let v = dispatch("date_diff",
+        let v = dispatch(
+            "date_diff",
             Some(s("2026-06-28T00:00:00")),
-            vec![s("2026-07-08T00:00:00"), s("days")]).unwrap();
+            vec![s("2026-07-08T00:00:00"), s("days")],
+        )
+        .unwrap();
         assert_eq!(v, Value::Int(10));
     }
 
     #[test]
     fn date_diff_days_backward_is_negative() {
-        let v = dispatch("date_diff",
+        let v = dispatch(
+            "date_diff",
             Some(s("2026-07-08T00:00:00")),
-            vec![s("2026-06-28T00:00:00"), s("days")]).unwrap();
+            vec![s("2026-06-28T00:00:00"), s("days")],
+        )
+        .unwrap();
         assert_eq!(v, Value::Int(-10));
     }
 
     #[test]
     fn date_diff_years() {
-        let v = dispatch("date_diff",
+        let v = dispatch(
+            "date_diff",
             Some(s("2020-01-01T00:00:00")),
-            vec![s("2026-01-01T00:00:00"), s("years")]).unwrap();
+            vec![s("2026-01-01T00:00:00"), s("years")],
+        )
+        .unwrap();
         assert_eq!(v, Value::Int(6));
     }
 
     #[test]
     fn date_format_reformats() {
-        let v = dispatch("date_format", Some(s("2026-06-28T15:30:00")), vec![s("DD/MM/YYYY")]).unwrap();
+        let v = dispatch(
+            "date_format",
+            Some(s("2026-06-28T15:30:00")),
+            vec![s("DD/MM/YYYY")],
+        )
+        .unwrap();
         assert_eq!(v, s("28/06/2026"));
     }
 
@@ -1009,24 +1160,44 @@ mod tests {
 
     #[test]
     fn year_extracts() {
-        assert_eq!(dispatch("year", Some(s("2026-06-28")), vec![]).unwrap(), Value::Int(2026));
+        assert_eq!(
+            dispatch("year", Some(s("2026-06-28")), vec![]).unwrap(),
+            Value::Int(2026)
+        );
     }
 
     #[test]
     fn month_extracts() {
-        assert_eq!(dispatch("month", Some(s("2026-06-28")), vec![]).unwrap(), Value::Int(6));
+        assert_eq!(
+            dispatch("month", Some(s("2026-06-28")), vec![]).unwrap(),
+            Value::Int(6)
+        );
     }
 
     #[test]
     fn day_extracts() {
-        assert_eq!(dispatch("day", Some(s("2026-06-28")), vec![]).unwrap(), Value::Int(28));
+        assert_eq!(
+            dispatch("day", Some(s("2026-06-28")), vec![]).unwrap(),
+            Value::Int(28)
+        );
     }
 
     #[test]
     fn weekday_returns_full_name() {
         let v = dispatch("weekday", Some(s("2026-06-28")), vec![]).unwrap();
-        let valid = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let valid = [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ];
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert!(valid.contains(&out.as_str()), "unexpected: {out}");
     }
 
@@ -1106,7 +1277,10 @@ mod tests {
     #[test]
     fn uuid_default_is_v4() {
         let v = dispatch("uuid", None, vec![]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert!(is_uuid_format(&out), "bad format: {out}");
         assert_eq!(&out[14..15], "4", "version digit: {out}");
     }
@@ -1114,7 +1288,10 @@ mod tests {
     #[test]
     fn uuid_explicit_v4() {
         let v = dispatch("uuid", None, vec![Value::Int(4)]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert!(is_uuid_format(&out));
         assert_eq!(&out[14..15], "4");
     }
@@ -1122,7 +1299,10 @@ mod tests {
     #[test]
     fn uuid_v7() {
         let v = dispatch("uuid", None, vec![Value::Int(7)]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert!(is_uuid_format(&out), "bad format: {out}");
         assert_eq!(&out[14..15], "7", "version digit: {out}");
     }
@@ -1153,7 +1333,10 @@ mod tests {
     #[test]
     fn now_default_format_is_iso8601() {
         let v = dispatch("now", None, vec![]).unwrap();
-        let s = match v { Value::Str(s) => s, _ => panic!("expected Str") };
+        let s = match v {
+            Value::Str(s) => s,
+            _ => panic!("expected Str"),
+        };
         // ISO 8601: YYYY-MM-DDTHH:MM:SS (19 chars)
         assert_eq!(s.len(), 19, "default now() format: {s}");
         assert_eq!(&s[4..5], "-");
@@ -1164,7 +1347,10 @@ mod tests {
     #[test]
     fn now_yyyymmdd_format() {
         let v = dispatch("now", None, vec![s("YYYYMMDD")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 8, "YYYYMMDD should be 8 chars: {out}");
         assert!(out.chars().all(|c| c.is_ascii_digit()), "all digits: {out}");
     }
@@ -1172,7 +1358,10 @@ mod tests {
     #[test]
     fn now_yyyy_mm_dd_format() {
         let v = dispatch("now", None, vec![s("YYYY-MM-DD")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 10, "YYYY-MM-DD: {out}");
         assert_eq!(&out[4..5], "-");
         assert_eq!(&out[7..8], "-");
@@ -1181,7 +1370,10 @@ mod tests {
     #[test]
     fn now_year_only() {
         let v = dispatch("now", None, vec![s("YYYY")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 4);
         assert!(out.parse::<u32>().is_ok(), "should be a number: {out}");
     }
@@ -1205,39 +1397,63 @@ mod tests {
     #[test]
     fn secret_default_is_32_alphanumeric() {
         let v = dispatch("secret", None, vec![]).unwrap();
-        let s = match v { Value::Str(s) => s, _ => panic!() };
+        let s = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(s.len(), 32);
-        assert!(s.chars().all(|c| c.is_ascii_alphanumeric()), "non-alphanumeric: {s}");
+        assert!(
+            s.chars().all(|c| c.is_ascii_alphanumeric()),
+            "non-alphanumeric: {s}"
+        );
     }
 
     #[test]
     fn secret_custom_length() {
         let v = dispatch("secret", None, vec![Value::Int(64)]).unwrap();
-        let s = match v { Value::Str(s) => s, _ => panic!() };
+        let s = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(s.len(), 64);
     }
 
     #[test]
     fn secret_custom_alphabet() {
         let v = dispatch("secret", None, vec![Value::Int(16), s("abcdef0123456789")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 16);
-        assert!(out.chars().all(|c| "abcdef0123456789".contains(c)), "non-hex: {out}");
+        assert!(
+            out.chars().all(|c| "abcdef0123456789".contains(c)),
+            "non-hex: {out}"
+        );
     }
 
     #[test]
     fn secret_preset_hex() {
         let v = dispatch("secret", None, vec![Value::Int(32), s("hex")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 32);
-        assert!(out.chars().all(|c| "0123456789abcdef".contains(c)), "non-hex: {out}");
+        assert!(
+            out.chars().all(|c| "0123456789abcdef".contains(c)),
+            "non-hex: {out}"
+        );
     }
 
     #[test]
     fn secret_preset_base64() {
         let valid = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let v = dispatch("secret", None, vec![Value::Int(32), s("base64")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 32);
         assert!(out.chars().all(|c| valid.contains(c)), "non-base64: {out}");
     }
@@ -1246,25 +1462,43 @@ mod tests {
     fn secret_preset_base64url() {
         let valid = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
         let v = dispatch("secret", None, vec![Value::Int(32), s("base64url")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 32);
-        assert!(out.chars().all(|c| valid.contains(c)), "non-base64url: {out}");
+        assert!(
+            out.chars().all(|c| valid.contains(c)),
+            "non-base64url: {out}"
+        );
     }
 
     #[test]
     fn secret_preset_alpha() {
         let v = dispatch("secret", None, vec![Value::Int(20), s("alpha")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 20);
-        assert!(out.chars().all(|c| c.is_ascii_alphabetic()), "non-alpha: {out}");
+        assert!(
+            out.chars().all(|c| c.is_ascii_alphabetic()),
+            "non-alpha: {out}"
+        );
     }
 
     #[test]
     fn secret_preset_numeric() {
         let v = dispatch("secret", None, vec![Value::Int(10), s("numeric")]).unwrap();
-        let out = match v { Value::Str(s) => s, _ => panic!() };
+        let out = match v {
+            Value::Str(s) => s,
+            _ => panic!(),
+        };
         assert_eq!(out.len(), 10);
-        assert!(out.chars().all(|c| c.is_ascii_digit()), "non-numeric: {out}");
+        assert!(
+            out.chars().all(|c| c.is_ascii_digit()),
+            "non-numeric: {out}"
+        );
     }
 
     #[test]

@@ -1,10 +1,10 @@
-use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 use petgraph::{
+    Direction,
     algo::kosaraju_scc,
     graph::{DiGraph, NodeIndex},
-    Direction,
 };
 
 use crate::{
@@ -109,9 +109,7 @@ fn find_cycle_path(graph: &DiGraph<String, ()>, hint: NodeIndex) -> String {
     // Locate the SCC that contains `hint` and actually forms a cycle.
     let target = sccs.iter().find(|scc| {
         (scc.len() > 1 && scc.contains(&hint))
-            || (scc.len() == 1
-                && scc[0] == hint
-                && graph.contains_edge(hint, hint))
+            || (scc.len() == 1 && scc[0] == hint && graph.contains_edge(hint, hint))
     });
 
     match target {
@@ -187,7 +185,13 @@ mod tests {
         let file = parser::parse(src, "test.envx", path.clone()).unwrap();
         let mut env = ResolvedEnv::default();
         for stmt in file.statements {
-            if let Statement::Entry { key, template, source, .. } = stmt {
+            if let Statement::Entry {
+                key,
+                template,
+                source,
+                ..
+            } = stmt
+            {
                 env.entries.insert(key, (template, source));
             }
         }
@@ -205,9 +209,7 @@ mod tests {
     #[test]
     fn linear_dependency_reversed() {
         // C depends on B, B depends on A → order must be A, B, C
-        let env = make_env(
-            "C = \"${{ $B }}\"\nB = \"${{ $A }}\"\nA = \"base\"\n",
-        );
+        let env = make_env("C = \"${{ $B }}\"\nB = \"${{ $A }}\"\nA = \"base\"\n");
         let order = build_and_sort(&env).unwrap();
         let pos = |name: &str| order.iter().position(|k| k == name).unwrap();
         assert!(pos("A") < pos("B"));
@@ -243,7 +245,8 @@ mod tests {
         assert!(
             matches!(&err, EnvxError::CircularDependency { cycle }
                 if cycle.contains('A') || cycle.contains('B')),
-            "unexpected err: {:?}", err
+            "unexpected err: {:?}",
+            err
         );
     }
 
@@ -258,9 +261,7 @@ mod tests {
 
     #[test]
     fn three_node_cycle_is_error() {
-        let env = make_env(
-            "A = \"${{ $C }}\"\nB = \"${{ $A }}\"\nC = \"${{ $B }}\"\n",
-        );
+        let env = make_env("A = \"${{ $C }}\"\nB = \"${{ $A }}\"\nC = \"${{ $B }}\"\n");
         let err = build_and_sort(&env).unwrap_err();
         assert!(matches!(err, EnvxError::CircularDependency { .. }));
         if let EnvxError::CircularDependency { cycle } = err {

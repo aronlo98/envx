@@ -163,6 +163,23 @@ PORT = "${{ ENV('PORT') | default('8080') }}"
 
 `ENV` returns an empty string if the variable is not set, so chaining `| default(...)` is the idiomatic fallback pattern.
 
+### Sections
+
+Group variables visually with `[section_name]` headers (INI-style). Sections are purely organisational — they have no effect on evaluation and variables remain in a flat shared namespace.
+
+```env
+[database]
+DB_HOST = "localhost"
+DB_PORT = "5432"
+DB_NAME = "myapp"
+
+[app]
+APP_ENV = "prod"
+PORT    = "3000"
+```
+
+Section names must match `[A-Za-z_][A-Za-z0-9_]*`. Use `envx fmt` to normalise spacing around brackets.
+
 ### Imports
 
 Split your configuration into multiple files:
@@ -296,15 +313,41 @@ envx run app.envx -- npm start
 envx run staging.envx -- ./deploy.sh
 ```
 
+Use `--tag` / `-t` to inject only variables from specific sections. All variables are still evaluated (to resolve cross-section dependencies), but only those in the requested tag(s) are passed to the process:
+
+```sh
+envx run -t database app.envx -- ./migrate.sh
+envx run -t database -t app app.envx -- ./start.sh
+```
+
 ### `envx print <file.envx>`
 
-Evaluate the file and print each variable as a plain `KEY=VALUE` line — no `export`, no quoting. Useful for piping into other tools.
+Evaluate the file and print all variables in an aligned `KEY | VALUE` table.
 
 ```sh
 $ envx print app.envx
-APP_ENV=prod
-USERNAME=alice_smith
-PORT=3000
+KEY      | VALUE
+---------+---------
+APP_ENV  | prod
+USERNAME | alice_smith
+PORT     | 3000
+```
+
+**`-T` / `--tags`** — add a `TAG` column and sort by tag name ascending:
+
+```sh
+$ envx print -T app.envx
+TAG      | KEY     | VALUE
+---------+---------+-------
+app      | APP_ENV | prod
+database | DB_HOST | localhost
+```
+
+**`-t TAG` / `--tag TAG`** — filter to variables from a specific section (repeatable):
+
+```sh
+$ envx print -t database app.envx
+$ envx print -T -t database -t app app.envx
 ```
 
 ### `envx fmt <file.envx>`

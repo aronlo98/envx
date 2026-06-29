@@ -78,7 +78,9 @@ fn load_recursive(
 
     for stmt in file.statements {
         match stmt {
-            Statement::Import { resolved, raw_path, .. } => {
+            Statement::Import {
+                resolved, raw_path, ..
+            } => {
                 // Canonicalize the resolved path; error if the target file
                 // does not exist so the user gets a clear message.
                 let canonical = fs_canonicalize(&resolved, Some(&raw_path))?;
@@ -87,7 +89,12 @@ fn load_recursive(
             Statement::Section { name, .. } => {
                 env.layout.push(LayoutItem::Section(name));
             }
-            Statement::Entry { key, template, source: src_file, .. } => {
+            Statement::Entry {
+                key,
+                template,
+                source: src_file,
+                ..
+            } => {
                 if let Some((_, first)) = env.entries.get(&key) {
                     return Err(EnvxError::DuplicateVariable {
                         key,
@@ -119,7 +126,10 @@ fn fs_canonicalize(path: &Path, raw_import: Option<&str>) -> Result<PathBuf> {
             raw_path: raw.to_string(),
             from_file: path.display().to_string(),
         },
-        None => EnvxError::Io { path: path.display().to_string(), source: e },
+        None => EnvxError::Io {
+            path: path.display().to_string(),
+            source: e,
+        },
     })
 }
 
@@ -215,7 +225,10 @@ mod tests {
     fn simple_import() {
         let tmp = TempDir::new();
         tmp.write("base.envx", "DB_HOST = \"localhost\"\nDB_PORT = \"5432\"\n");
-        let app = tmp.write("app.envx", "@import \"./base.envx\"\nAPP_NAME = \"myapp\"\n");
+        let app = tmp.write(
+            "app.envx",
+            "@import \"./base.envx\"\nAPP_NAME = \"myapp\"\n",
+        );
 
         let env = load(&app).unwrap();
         assert_eq!(env.entries.len(), 3);
@@ -298,7 +311,8 @@ mod tests {
         let err = load(&app).unwrap_err();
         assert!(
             matches!(err, EnvxError::CircularImport { ref cycle } if cycle.contains("app.envx")),
-            "unexpected error: {:?}", err
+            "unexpected error: {:?}",
+            err
         );
     }
 
@@ -339,12 +353,16 @@ mod tests {
     fn duplicate_key_across_files_is_error() {
         let tmp = TempDir::new();
         tmp.write("base.envx", "DB_HOST = \"localhost\"\n");
-        let app = tmp.write("app.envx", "@import \"./base.envx\"\nDB_HOST = \"prod.db.com\"\n");
+        let app = tmp.write(
+            "app.envx",
+            "@import \"./base.envx\"\nDB_HOST = \"prod.db.com\"\n",
+        );
 
         let err = load(&app).unwrap_err();
         assert!(
             matches!(err, EnvxError::DuplicateVariable { ref key, .. } if key == "DB_HOST"),
-            "unexpected error: {:?}", err
+            "unexpected error: {:?}",
+            err
         );
     }
 
@@ -354,12 +372,23 @@ mod tests {
         tmp.write("base.envx", "X = \"1\"\n");
         let app = tmp.write("app.envx", "@import \"./base.envx\"\nX = \"2\"\n");
 
-        if let Err(EnvxError::DuplicateVariable { key, first_file, second_file }) =
-            load(&app)
+        if let Err(EnvxError::DuplicateVariable {
+            key,
+            first_file,
+            second_file,
+        }) = load(&app)
         {
             assert_eq!(key, "X");
-            assert!(first_file.contains("base.envx"), "first_file: {}", first_file);
-            assert!(second_file.contains("app.envx"), "second_file: {}", second_file);
+            assert!(
+                first_file.contains("base.envx"),
+                "first_file: {}",
+                first_file
+            );
+            assert!(
+                second_file.contains("app.envx"),
+                "second_file: {}",
+                second_file
+            );
         } else {
             panic!("expected DuplicateVariable");
         }
@@ -371,10 +400,15 @@ mod tests {
         let tmp = TempDir::new();
         tmp.write("db.envx", "PORT = \"5432\"\n");
         tmp.write("app_ports.envx", "PORT = \"8080\"\n");
-        let root =
-            tmp.write("root.envx", "@import \"./db.envx\"\n@import \"./app_ports.envx\"\n");
+        let root = tmp.write(
+            "root.envx",
+            "@import \"./db.envx\"\n@import \"./app_ports.envx\"\n",
+        );
 
-        assert!(matches!(load(&root), Err(EnvxError::DuplicateVariable { .. })));
+        assert!(matches!(
+            load(&root),
+            Err(EnvxError::DuplicateVariable { .. })
+        ));
     }
 
     // ── Error: missing file ───────────────────────────────────────────────────

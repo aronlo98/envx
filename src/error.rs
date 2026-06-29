@@ -6,7 +6,6 @@ pub type Result<T> = std::result::Result<T, EnvxError>;
 #[derive(Debug, Error, Diagnostic)]
 pub enum EnvxError {
     // ── Lexer ─────────────────────────────────────────────────────────────────
-
     #[error("unexpected character in source")]
     #[diagnostic(
         code(envx::lex::unexpected_char),
@@ -32,7 +31,6 @@ pub enum EnvxError {
     },
 
     // ── Parser ────────────────────────────────────────────────────────────────
-
     /// `${{` without matching `}}`
     #[error("unclosed expression block: `${{{{` was never closed with `}}}}`")]
     #[diagnostic(
@@ -67,7 +65,6 @@ pub enum EnvxError {
     },
 
     // ── Loader ────────────────────────────────────────────────────────────────
-
     #[error("circular import detected: {cycle}")]
     #[diagnostic(
         code(envx::load::circular_import),
@@ -75,7 +72,9 @@ pub enum EnvxError {
     )]
     CircularImport { cycle: String },
 
-    #[error("duplicate variable `{key}`: first defined in `{first_file}`, redefined in `{second_file}`")]
+    #[error(
+        "duplicate variable `{key}`: first defined in `{first_file}`, redefined in `{second_file}`"
+    )]
     #[diagnostic(
         code(envx::load::duplicate_var),
         help("each variable may only be defined once across all imported files")
@@ -91,7 +90,6 @@ pub enum EnvxError {
     BadImportPath { raw_path: String, from_file: String },
 
     // ── DAG ───────────────────────────────────────────────────────────────────
-
     #[error("circular dependency detected: {cycle}")]
     #[diagnostic(
         code(envx::dag::circular_dep),
@@ -100,7 +98,6 @@ pub enum EnvxError {
     CircularDependency { cycle: String },
 
     // ── Evaluator ─────────────────────────────────────────────────────────────
-
     #[error("undefined variable `${name}`")]
     #[diagnostic(code(envx::eval::undefined_var))]
     UndefinedVariable {
@@ -114,7 +111,9 @@ pub enum EnvxError {
     #[error("unknown function `{name}`")]
     #[diagnostic(
         code(envx::eval::unknown_fn),
-        help("allowed functions: abs, capitalize, concat, date_add, date_diff, date_format, day, default, emoji, eq, int, len, lower, month, now, replace, round, secret, timestamp, title, trim, truncate, upper, uuid, weekday, year")
+        help(
+            "allowed functions: abs, capitalize, concat, date_add, date_diff, date_format, day, default, emoji, eq, int, len, lower, month, now, replace, round, secret, timestamp, title, trim, truncate, upper, uuid, weekday, year"
+        )
     )]
     UnknownFunction { name: String },
 
@@ -139,7 +138,6 @@ pub enum EnvxError {
     InvalidArgument { func: String, message: String },
 
     // ── I/O ───────────────────────────────────────────────────────────────────
-
     #[error("cannot read file `{path}`")]
     #[diagnostic(code(envx::io::read_error))]
     Io {

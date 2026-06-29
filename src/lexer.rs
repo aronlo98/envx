@@ -129,14 +129,18 @@ fn scan_string(lex: &mut Lexer<FileToken>) -> Option<String> {
 #[logos(skip r"[ \t]+")] // skip horizontal whitespace inside expressions
 pub enum ExprToken {
     // ── Keywords ──────────────────────────────────────────────────────────────
-    #[token("if")]    If,
-    #[token("then")]  Then,
-    #[token("else")]  Else,
-    #[token("true")]  True,
-    #[token("false")] False,
+    #[token("if")]
+    If,
+    #[token("then")]
+    Then,
+    #[token("else")]
+    Else,
+    #[token("true")]
+    True,
+    #[token("false")]
+    False,
 
     // ── Values ────────────────────────────────────────────────────────────────
-
     /// A variable reference: `$NAME`.
     /// The associated `String` is the variable name **without** the leading `$`.
     #[regex(r"\$[A-Za-z_][A-Za-z0-9_]*", |lex| lex.slice()[1..].to_string())]
@@ -164,19 +168,22 @@ pub enum ExprToken {
     IntLit(i64),
 
     // ── Operators & punctuation ───────────────────────────────────────────────
-
     /// Pipe operator — chains the output of one expression into a function:
     /// `$NAME | trim | lower`.
-    #[token("|")]  Pipe,
+    #[token("|")]
+    Pipe,
 
     /// Opening parenthesis for function arguments: `replace(' ', '_')`.
-    #[token("(")]  LParen,
+    #[token("(")]
+    LParen,
 
     /// Closing parenthesis.
-    #[token(")")]  RParen,
+    #[token(")")]
+    RParen,
 
     /// Argument separator inside function calls.
-    #[token(",")]  Comma,
+    #[token(",")]
+    Comma,
 }
 
 // ─── Public tokenization API ──────────────────────────────────────────────────
@@ -288,7 +295,11 @@ mod tests {
         let src = "X = \"hello world\"\n";
         let tokens = lex_file(src, "test.envx").unwrap();
         let content = tokens.iter().find_map(|(t, _)| {
-            if let FileToken::StringContent(s) = t { Some(s.clone()) } else { None }
+            if let FileToken::StringContent(s) = t {
+                Some(s.clone())
+            } else {
+                None
+            }
         });
         assert_eq!(content.unwrap(), "hello world");
     }
@@ -300,7 +311,11 @@ mod tests {
         let src = "X = \"${{ $NAME | trim }}\"\n";
         let tokens = lex_file(src, "test.envx").unwrap();
         let content = tokens.iter().find_map(|(t, _)| {
-            if let FileToken::StringContent(s) = t { Some(s.clone()) } else { None }
+            if let FileToken::StringContent(s) = t {
+                Some(s.clone())
+            } else {
+                None
+            }
         });
         assert_eq!(content.unwrap(), "${{ $NAME | trim }}");
     }

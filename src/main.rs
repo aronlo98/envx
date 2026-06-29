@@ -26,10 +26,10 @@ use value::Value;
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Run { file, cmd } => cmd_run(file, cmd),
+        Commands::Run { file, tag, cmd } => cmd_run(file, cmd, tag),
         Commands::Export { file } => cmd_export(file),
         Commands::Eval { expr } => cmd_eval(expr),
-        Commands::Print { file, tags } => cmd_print(file, tags),
+        Commands::Print { file, tags, tag } => cmd_print(file, tags, tag),
         Commands::Fmt { file, check } => cmd_fmt(file, check),
         Commands::Completions { shell } => {
             cmd_completions(shell);
@@ -45,12 +45,21 @@ fn main() {
 
 // ─── Subcommand: run ──────────────────────────────────────────────────────────
 
-fn cmd_run(file: PathBuf, cmd: Vec<String>) -> Result<()> {
-    let vars = load_and_eval(&file)?;
-
-    // cmd is guaranteed non-empty by clap's `required = true`.
+fn cmd_run(file: PathBuf, cmd: Vec<String>, filter: Vec<String>) -> Result<()> {
     let binary = &cmd[0];
     let args = &cmd[1..];
+
+    let vars = if filter.is_empty() {
+        load_and_eval(&file)?
+    } else {
+        let env = loader::load(&file)?;
+        let allowed = keys_for_tags(&env, &filter);
+        let order = dag::build_and_sort(&env)?;
+        evaluator::evaluate(&env, &order)?
+            .into_iter()
+            .filter(|(k, _)| allowed.contains(k))
+            .collect()
+    };
 
     let status = process::Command::new(binary)
         .args(args)
@@ -78,22 +87,53 @@ fn cmd_export(file: PathBuf) -> Result<()> {
 
 // ─── Subcommand: print ───────────────────────────────────────────────────────
 
-fn cmd_print(file: PathBuf, tags: bool) -> Result<()> {
+fn cmd_print(file: PathBuf, tags: bool, filter: Vec<String>) -> Result<()> {
     let env = loader::load(&file)?;
     let order = dag::build_and_sort(&env)?;
     let values = evaluator::evaluate(&env, &order)?;
+    let allowed = keys_for_tags(&env, &filter);
 
     if tags {
-        cmd_print_tags(&env, &values);
+        cmd_print_tags(&env, &values, &allowed);
     } else {
-        cmd_print_table(&env, &values);
+        cmd_print_table(&env, &values, &allowed);
     }
     Ok(())
 }
 
-fn cmd_print_table(env: &ast::ResolvedEnv, values: &IndexMap<String, Value>) {
-    let key_w = env.entries.keys().map(|k| k.len()).max().unwrap_or(0).max("KEY".len());
-    let val_w = values.values()
+/// Returns the set of keys that belong to the given tag filter.
+/// When `filter` is empty, all keys are returned (no filtering).
+fn keys_for_tags(
+    env: &ast::ResolvedEnv,
+    filter: &[String],
+) -> std::collections::HashSet<String> {
+    if filter.is_empty() {
+        return env.entries.keys().cloned().collect();
+    }
+    let mut allowed = std::collections::HashSet::new();
+    let mut current_tag = String::new();
+    for item in &env.layout {
+        match item {
+            LayoutItem::Section(name) => current_tag = name.clone(),
+            LayoutItem::Entry(key) => {
+                if filter.contains(&current_tag) {
+                    allowed.insert(key.clone());
+                }
+            }
+        }
+    }
+    allowed
+}
+
+fn cmd_print_table(
+    env: &ast::ResolvedEnv,
+    values: &IndexMap<String, Value>,
+    allowed: &std::collections::HashSet<String>,
+) {
+    let key_w = allowed.iter().map(|k| k.len()).max().unwrap_or(0).max("KEY".len());
+    let val_w = allowed
+        .iter()
+        .filter_map(|k| values.get(k))
         .map(|v| v.as_str_repr().len())
         .max()
         .unwrap_or(0)
@@ -104,23 +144,30 @@ fn cmd_print_table(env: &ast::ResolvedEnv, values: &IndexMap<String, Value>) {
 
     for item in &env.layout {
         if let LayoutItem::Entry(key) = item {
-            if let Some(val) = values.get(key) {
-                println!("{key:<key_w$} | {}", val.as_str_repr());
+            if allowed.contains(key) {
+                if let Some(val) = values.get(key) {
+                    println!("{key:<key_w$} | {}", val.as_str_repr());
+                }
             }
         }
     }
 }
 
-fn cmd_print_tags(env: &ast::ResolvedEnv, values: &IndexMap<String, Value>) {
-    // Build (tag, key, value) triples by walking the layout in order.
+fn cmd_print_tags(
+    env: &ast::ResolvedEnv,
+    values: &IndexMap<String, Value>,
+    allowed: &std::collections::HashSet<String>,
+) {
     let mut rows: Vec<(String, String, String)> = Vec::new();
     let mut current_tag = String::new();
     for item in &env.layout {
         match item {
             LayoutItem::Section(name) => current_tag = name.clone(),
             LayoutItem::Entry(key) => {
-                if let Some(val) = values.get(key) {
-                    rows.push((current_tag.clone(), key.clone(), val.as_str_repr()));
+                if allowed.contains(key) {
+                    if let Some(val) = values.get(key) {
+                        rows.push((current_tag.clone(), key.clone(), val.as_str_repr()));
+                    }
                 }
             }
         }
@@ -163,7 +210,13 @@ fn cmd_eval(expr: String) -> Result<()> {
     // Parse the synthetic entry; it may reference OS vars loaded above.
     let file = parser::parse(&src, "<eval>", eval_path)?;
     for stmt in file.statements {
-        if let Statement::Entry { key, template, source, .. } = stmt {
+        if let Statement::Entry {
+            key,
+            template,
+            source,
+            ..
+        } = stmt
+        {
             // Insert last so __RESULT__ always wins even if an OS var shares the name.
             env.entries.insert(key, (template, source));
         }
@@ -192,25 +245,30 @@ fn cmd_completions(shell: ShellChoice) {
     generate(shell, &mut cmd, "envx", &mut io::stdout());
 }
 
-
-
 // ─── Subcommand: fmt ─────────────────────────────────────────────────────────
 
 fn cmd_fmt(file: PathBuf, check: bool) -> Result<()> {
-    let source = std::fs::read_to_string(&file)
-        .map_err(|e| EnvxError::Io { path: file.display().to_string(), source: e })?;
+    let source = std::fs::read_to_string(&file).map_err(|e| EnvxError::Io {
+        path: file.display().to_string(),
+        source: e,
+    })?;
 
     let formatted = format_source(&source);
 
     if check {
         if formatted != source {
-            eprintln!("error: `{}` is not formatted — run `envx fmt` to fix", file.display());
+            eprintln!(
+                "error: `{}` is not formatted — run `envx fmt` to fix",
+                file.display()
+            );
             process::exit(1);
         }
         eprintln!("{}: ok", file.display());
     } else {
-        std::fs::write(&file, &formatted)
-            .map_err(|e| EnvxError::Io { path: file.display().to_string(), source: e })?;
+        std::fs::write(&file, &formatted).map_err(|e| EnvxError::Io {
+            path: file.display().to_string(),
+            source: e,
+        })?;
         eprintln!("formatted: {}", file.display());
     }
     Ok(())
@@ -264,7 +322,9 @@ fn normalize_exprs(s: &str) -> String {
 
             while inner < len {
                 if in_str {
-                    if bytes[inner] == b'\'' { in_str = false; }
+                    if bytes[inner] == b'\'' {
+                        in_str = false;
+                    }
                     inner += 1;
                 } else if bytes[inner] == b'\'' {
                     in_str = true;

@@ -30,6 +30,8 @@ _envx() {
         case $line[1] in
             (run)
 _arguments "${_arguments_options[@]}" : \
+'*-t+[Only inject variables belonging to these section tags (repeatable\: -t db -t app)]:TAG:_default' \
+'*--tag=[Only inject variables belonging to these section tags (repeatable\: -t db -t app)]:TAG:_default' \
 '-h[Print help]' \
 '--help[Print help]' \
 ':file -- Path to the .envx file:_files' \
@@ -52,7 +54,9 @@ _arguments "${_arguments_options[@]}" : \
 ;;
 (print)
 _arguments "${_arguments_options[@]}" : \
-'-t[Show a TAG column and sort rows by tag name ascending]' \
+'*-t+[Only show variables belonging to these section tags (repeatable\: -t db -t app)]:TAG:_default' \
+'*--tag=[Only show variables belonging to these section tags (repeatable\: -t db -t app)]:TAG:_default' \
+'-T[Show a TAG column and sort rows by tag name ascending]' \
 '--tags[Show a TAG column and sort rows by tag name ascending]' \
 '-h[Print help (see more with '\''--help'\'')]' \
 '--help[Print help (see more with '\''--help'\'')]' \

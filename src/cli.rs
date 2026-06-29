@@ -28,6 +28,10 @@ pub enum Commands {
         /// Path to the .envx file
         file: PathBuf,
 
+        /// Only inject variables belonging to these section tags (repeatable: -t db -t app)
+        #[arg(long = "tag", short = 't', value_name = "TAG")]
+        tag: Vec<String>,
+
         /// Command and arguments (use `--` to separate from envx options)
         #[arg(trailing_var_arg = true, required = true, value_name = "CMD")]
         cmd: Vec<String>,
@@ -54,21 +58,24 @@ pub enum Commands {
     ///
     /// Example:  envx print app.envx
     ///           envx print --tags app.envx
+    ///           envx print -T -t database app.envx
     Print {
         /// Path to the .envx file
         file: PathBuf,
 
         /// Show a TAG column and sort rows by tag name ascending
-        #[arg(long, short = 't')]
+        #[arg(long, short = 'T')]
         tags: bool,
+
+        /// Only show variables belonging to these section tags (repeatable: -t db -t app)
+        #[arg(long = "tag", short = 't', value_name = "TAG")]
+        tag: Vec<String>,
     },
 
     /// Print the shell completion script for the given shell
     ///
     /// Example:  envx completions zsh > ~/.zfunc/_envx
-    Completions {
-        shell: ShellChoice,
-    },
+    Completions { shell: ShellChoice },
 
     /// Format a .envx file — aligns `=` across all assignments
     ///
